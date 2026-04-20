@@ -25,7 +25,6 @@
     .status.ok{border-color:rgba(26,209,122,.45);} .status.ko{border-color:rgba(255,92,92,.45);}
     .hint{font-size:12px;color:var(--muted);line-height:1.45;margin-top:6px;}
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;}
-
     .camwrap{position:relative;margin-top:12px;border-radius:14px;overflow:hidden;border:1px solid rgba(170,184,222,.20);background:#000;}
     video{width:100%;height:auto;display:block;}
     .overlay{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center;}
@@ -71,8 +70,10 @@
     </div>
   </div>
 
-  <!-- Décodeur Code 128 (ZXing Browser) + lecture Excel -->
+  <!-- ✅ SCRIPTS CORRECTS -->
+  <!-- ZXingBrowser global via script tag (UMD) -->
   <script src="https://unpkg.com/@zxing/browser@latest"></script>
+  <!-- XLSX -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <script>
@@ -126,7 +127,7 @@
       else setResult(`${code} → NON TROUVÉ`);
     }
 
-    // ✅ Amorçage permission caméra iOS (popup déclenchée ici)
+    // ✅ Amorçage permission caméra iOS (déclenche la popup ici)
     async function primeCameraPermission(){
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
       s.getTracks().forEach(t=>t.stop());
@@ -135,19 +136,15 @@
     async function startScan(){
       updateLibHint();
       if(typeof ZXingBrowser === 'undefined'){
-        alert('ZXingBrowser non chargé (réseau/CDN).');
-        return;
-      }
-      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-        alert('getUserMedia indisponible dans ce contexte. Ouvre dans Safari.');
+        alert('ZXingBrowser non chargé (CDN bloqué).');
         return;
       }
 
-      // 1) popup iOS (si nécessaire)
+      // 1) popup permission (si nécessaire)
       try{
         await primeCameraPermission();
       }catch(e){
-        alert('Accès caméra refusé / bloqué.');
+        alert('Accès caméra refusé/bloqué.');
         log('primeCameraPermission: ' + (e && e.name ? e.name : e));
         return;
       }
@@ -166,6 +163,7 @@
         // ✅ CODE 128 UNIQUEMENT
         const hints = new Map();
         hints.set(ZXingBrowser.DecodeHintType.POSSIBLE_FORMATS, [ZXingBrowser.BarcodeFormat.CODE_128]);
+
         const reader = new ZXingBrowser.BrowserMultiFormatReader(hints);
 
         controls = await reader.decodeFromVideoDevice(
@@ -201,7 +199,6 @@
       log('Scan stoppé');
     }
 
-    // Excel load
     $('fileInput').addEventListener('change', async (e)=>{
       updateLibHint();
       const f = e.target.files && e.target.files[0];
@@ -231,7 +228,6 @@
 
     $('startBtn').addEventListener('click', startScan);
     $('stopBtn').addEventListener('click', stopScan);
-
     $('searchBtn').addEventListener('click', ()=>lookup($('manual').value));
     $('manual').addEventListener('keydown', (e)=>{ if(e.key==='Enter') lookup($('manual').value); });
 
