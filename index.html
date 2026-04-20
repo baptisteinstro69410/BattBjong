@@ -1,329 +1,68 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>BJONG Scan → Recherche Excel</title>
-  <style>
-    :root{--bg:#0b1220;--card:#111a2e;--txt:#e8eefc;--muted:#aab8de;--ok:#1ad17a;--ko:#ff5c5c;--acc:#6aa6ff;}
-    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#081022,#0b1220);color:var(--txt);}
-    .wrap{max-width:920px;margin:0 auto;padding:18px 14px 40px;}
-    h1{font-size:20px;margin:10px 0 14px;}
-    .card{background:rgba(17,26,46,.92);border:1px solid rgba(106,166,255,.18);border-radius:14px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.35);}
-    .grid{display:grid;grid-template-columns:1fr;gap:12px;}
-    @media(min-width:820px){.grid{grid-template-columns:360px 1fr;}}
-    label{display:block;font-size:13px;color:var(--muted);margin:6px 0;}
-    input[type=file], input[type=text]{width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(170,184,222,.25);background:#0c1427;color:var(--txt);}
-    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
-    button{appearance:none;border:0;border-radius:12px;padding:10px 14px;background:var(--acc);color:#071022;font-weight:700;cursor:pointer;}
-    button.secondary{background:transparent;border:1px solid rgba(106,166,255,.45);color:var(--txt);}
-    button.danger{background:var(--ko);color:#260707;}
-    .hint{font-size:12px;color:var(--muted);line-height:1.45;margin-top:6px;}
-    #reader{width:100%;aspect-ratio:4/3;border-radius:14px;overflow:hidden;border:1px solid rgba(170,184,222,.20);background:#060b16;}
-    .status{padding:10px 12px;border-radius:12px;border:1px solid rgba(170,184,222,.18);background:rgba(12,20,39,.9);}
-    .status.ok{border-color:rgba(26,209,122,.45);}
-    .status.ko{border-color:rgba(255,92,92,.45);}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;}
-    .kv{display:grid;grid-template-columns:140px 1fr;gap:6px 10px;align-items:center;}
-    .kv div:nth-child(odd){color:var(--muted);font-size:13px;}
-    .kv div:nth-child(even){font-size:14px;}
-    .pill{display:inline-block;padding:3px 10px;border-radius:999px;border:1px solid rgba(170,184,222,.22);font-size:12px;color:var(--muted);}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BJONG Scan</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<style>
+body{margin:0;font-family:-apple-system;background:#0b1220;color:#e8eefc}
+button{padding:12px 16px;font-size:16px;border-radius:10px;border:none}
+#reader{width:100%;height:60vh;background:#000}
+</style>
 </head>
+
 <body>
-  <div class="wrap">
-    <h1>Scan code-barres → Recherche dans Excel</h1>
-    <div class="grid">
-      <div class="card">
-        <label>1) Charger le fichier Excel (.xlsx)</label>
-        <input id="fileInput" type="file" accept=".xlsx" />
-        <div class="hint">Le fichier est lu localement dans Safari (aucun envoi). Une fois chargé, il est mémorisé sur l’iPhone (localStorage) pour les prochains scans.</div>
+<h2>Scan BJONG</h2>
+<input type="file" id="file" accept=".xlsx"><br><br>
+<button id="start">Démarrer le scan</button>
+<div id="reader"></div>
+<pre id="out"></pre>
 
-        <label style="margin-top:12px">2) Scanner ou saisir un SN</label>
-        <div class="row">
-          <button id="startBtn">Démarrer le scan</button>
-          <button id="stopBtn" class="secondary" disabled>Stop</button>
-        </div>
-        <div style="margin-top:10px"></div>
-        <input id="manual" type="text" placeholder="Saisie manuelle (ex: 2021000128930 ou V2021000128930)" />
-        <div class="row" style="margin-top:10px">
-          <button id="searchBtn" class="secondary">Rechercher</button>
-          <button id="clearBtn" class="danger">Effacer cache</button>
-        </div>
+<script src="https://unpkg.com/html5-qrcode@2.3.10/minified/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-        <div style="margin-top:12px" class="status" id="dbStatus">
-          <div><span class="pill" id="dbPill">Base non chargée</span></div>
-          <div class="hint" id="dbHint">Charge un fichier Excel pour activer la recherche.</div>
-        </div>
-      </div>
+<script>
+let db=new Map(),qr;
 
-      <div class="card">
-        <label>Caméra</label>
-        <div id="reader"></div>
-        <div style="margin-top:12px" class="status" id="resultBox">
-          <div class="kv">
-            <div>Dernier scan</div><div class="mono" id="lastCode">—</div>
-            <div>Statut</div><div id="statusText">—</div>
-            <div>SN trouvé</div><div class="mono" id="snFound">—</div>
-            <div>Date</div><div class="mono" id="dateFound">—</div>
-          </div>
-          <div class="hint" id="resultHint">Astuce : sur iPhone, accepte l’accès caméra. Le scan nécessite HTTPS (ou fichier local) pour iOS.</div>
-        </div>
-      </div>
-    </div>
-  </div>
+function norm(v){return String(v||"").trim().toUpperCase();}
+function out(t){document.getElementById("out").textContent=t;}
 
-  <!-- Librairies via CDN (internet requis). Pour usage offline : télécharger ces fichiers et remplacer par chemins locaux. -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://unpkg.com/html5-qrcode@2.3.10/minified/html5-qrcode.min.js"></script>
+document.getElementById("file").onchange=async e=>{
+ const buf=await e.target.files[0].arrayBuffer();
+ const wb=XLSX.read(buf,{type:"array"});
+ const ws=wb.Sheets[wb.SheetNames[0]];
+ const rows=XLSX.utils.sheet_to_json(ws,{header:1});
+ rows.slice(1).forEach(r=>{
+  if(r[0]) db.set(norm(r[0]), r[2]);
+  if(r[1]) db.set(norm(r[1]), r[2]);
+ });
+ out("Excel chargé");
+};
 
-  <script>
-    // =============================
-    // CONFIG : colonnes à utiliser
-    // =============================
-    // Votre fichier "TEST Batteries BJONG.xlsx" contient une feuille "Feuil1" avec :
-    // A = "NS", B = "NS (V)", C = "DATE".
-    // Ici on reste tolérant : on détecte par en-têtes si présents, sinon A/B/C.
-
-    const LS_KEY = 'bjong_scan_db_v1';
-    const LS_META = 'bjong_scan_meta_v1';
-
-    let db = null; // Map(normalizedSN -> {sn, date})
-    let html5Qr = null;
-    let scanning = false;
-
-    const $ = (id)=>document.getElementById(id);
-
-    function normalizeSN(s){
-      if(!s && s!==0) return '';
-      return String(s).trim().replace(/\s+/g,'').toUpperCase();
-    }
-
-    function toDisplayDate(v){
-      if(v==null || v==='') return '';
-      // xlsx peut donner string "12/19/2025 14:13:02" ou Date ou numéro.
-      if(v instanceof Date && !isNaN(v)) return v.toLocaleString('fr-FR');
-      if(typeof v === 'number'){
-        // Excel date serial
-        const d = XLSX.SSF.parse_date_code(v);
-        if(d){
-          const dt = new Date(d.y, d.m-1, d.d, d.H||0, d.M||0, Math.floor(d.S||0));
-          return dt.toLocaleString('fr-FR');
-        }
-      }
-      return String(v);
-    }
-
-    function setDbStatus(loaded, metaText=''){
-      const box = $('dbStatus');
-      const pill = $('dbPill');
-      const hint = $('dbHint');
-      if(loaded){
-        box.classList.add('ok');
-        box.classList.remove('ko');
-        pill.textContent = 'Base chargée';
-        hint.textContent = metaText || `Entrées: ${db ? db.size : 0}`;
-      } else {
-        box.classList.remove('ok');
-        box.classList.add('ko');
-        pill.textContent = 'Base non chargée';
-        hint.textContent = 'Charge un fichier Excel pour activer la recherche.';
-      }
-    }
-
-    function setResult(state, code, sn, date, extraHint=''){
-      $('lastCode').textContent = code || '—';
-      if(state==='ok'){
-        $('resultBox').classList.add('ok');
-        $('resultBox').classList.remove('ko');
-        $('statusText').textContent = 'Correspondance trouvée';
-      } else if(state==='ko'){
-        $('resultBox').classList.add('ko');
-        $('resultBox').classList.remove('ok');
-        $('statusText').textContent = 'Non trouvé';
-      } else {
-        $('resultBox').classList.remove('ok');
-        $('resultBox').classList.remove('ko');
-        $('statusText').textContent = '—';
-      }
-      $('snFound').textContent = sn || '—';
-      $('dateFound').textContent = date || '—';
-      $('resultHint').textContent = extraHint || '—';
-    }
-
-    function tryLookup(raw){
-      const code = normalizeSN(raw);
-      if(!code){
-        setResult('ko', raw, '', '', 'SN vide.');
-        return;
-      }
-      if(!db){
-        setResult('ko', code, '', '', 'Base non chargée : charge un Excel.');
-        return;
-      }
-
-      // 1) match direct
-      let hit = db.get(code);
-
-      // 2) tolérance : ajouter/enlever préfixe V
-      if(!hit){
-        if(code.startsWith('V')) hit = db.get(code.substring(1));
-        else hit = db.get('V'+code);
-      }
-
-      if(hit){
-        setResult('ok', code, hit.sn, hit.date, 'OK');
-      }else{
-        setResult('ko', code, '', '', 'Aucune ligne correspondante dans A ou B.');
-      }
-    }
-
-    function buildDbFromWorksheet(ws){
-      const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true});
-      if(!rows || rows.length===0) return new Map();
-
-      // Détection en-têtes
-      const header = rows[0].map(h=>normalizeSN(h));
-      let colA = 0, colB = 1, colD = 2;
-      const idxNS = header.findIndex(h => h==='NS' || h==='NSBATTERIE' || h==='SN' || h==='SERIALNUMBER');
-      const idxNSV = header.findIndex(h => h==='NS(V)' || h==='NS(V)' || h==='NS(V)' );
-      const idxDATE = header.findIndex(h => h==='DATE' || h==='HEUREDEDÉBUT' || h==='HEUREDEDEBUT' || h==='DATEDEBUT' || h==='START');
-
-      if(idxNS>=0) colA = idxNS;
-      if(idxNSV>=0) colB = idxNSV;
-      if(idxDATE>=0) colD = idxDATE;
-
-      const map = new Map();
-      for(let r=1; r<rows.length; r++){
-        const row = rows[r] || [];
-        const a = normalizeSN(row[colA]);
-        const b = normalizeSN(row[colB]);
-        const date = toDisplayDate(row[colD]);
-
-        // Enregistrer les deux clés si présentes
-        if(a){ map.set(a, {sn: a, date: date}); }
-        if(b){ map.set(b, {sn: b, date: date}); }
-      }
-      return map;
-    }
-
-    async function loadExcelFile(file){
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, {type:'array'});
-
-      // Priorité à "Feuil1" si existe, sinon 1ère feuille
-      const prefer = ['Feuil1','Sheet1'];
-      let sheetName = wb.SheetNames.find(n => prefer.includes(n)) || wb.SheetNames[0];
-      const ws = wb.Sheets[sheetName];
-
-      db = buildDbFromWorksheet(ws);
-
-      // Cache
-      const meta = {name:file.name, lastModified:file.lastModified, sheet:sheetName, size:db.size};
-      localStorage.setItem(LS_KEY, JSON.stringify(Array.from(db.entries())));
-      localStorage.setItem(LS_META, JSON.stringify(meta));
-
-      setDbStatus(true, `${meta.name} • feuille: ${meta.sheet} • entrées: ${meta.size}`);
-      setResult('', '', '', '', 'Base chargée. Scanne ou saisis un SN.');
-    }
-
-    function restoreCache(){
-      try{
-        const raw = localStorage.getItem(LS_KEY);
-        if(!raw) return false;
-        const entries = JSON.parse(raw);
-        db = new Map(entries);
-        const meta = JSON.parse(localStorage.getItem(LS_META) || '{}');
-        setDbStatus(true, `${meta.name||'Excel'} • feuille: ${meta.sheet||'?'} • entrées: ${meta.size||db.size}`);
-        setResult('', '', '', '', 'Base restaurée depuis le cache.');
-        return true;
-      }catch(e){
-        return false;
-      }
-    }
-
-    async function startScan(){
-      if(scanning) return;
-      if(!html5Qr){
-        html5Qr = new Html5Qrcode('reader');
-      }
-
-      const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 150 },
-        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-        rememberLastUsedCamera: true,
-        aspectRatio: 1.333
-      };
-
-      scanning = true;
-      $('startBtn').disabled = true;
-      $('stopBtn').disabled = false;
-
-      try{
-        const cameras = await Html5Qrcode.getCameras();
-        const camId = (cameras && cameras.length) ? cameras[cameras.length-1].id : undefined; // souvent la caméra arrière
-        await html5Qr.start(
-          camId,
-          config,
-          (decodedText)=>{
-            // Stop auto après un scan pour éviter rafales
-            tryLookup(decodedText);
-            stopScan();
-          },
-          ()=>{}
-        );
-        setResult('', '', '', '', 'Scan en cours…');
-      }catch(err){
-        scanning = false;
-        $('startBtn').disabled = false;
-        $('stopBtn').disabled = true;
-        setResult('ko','', '', '', 'Erreur caméra (iOS): vérifier l’autorisation et l’accès via HTTPS / fichier local.');
-      }
-    }
-
-    async function stopScan(){
-      if(!scanning) return;
-      try{
-        await html5Qr.stop();
-        await html5Qr.clear();
-      }catch(e){}
-      scanning = false;
-      $('startBtn').disabled = false;
-      $('stopBtn').disabled = true;
-    }
-
-    // UI bindings
-    $('fileInput').addEventListener('change', (e)=>{
-      const f = e.target.files && e.target.files[0];
-      if(f) loadExcelFile(f);
-    });
-
-    $('startBtn').addEventListener('click', startScan);
-    $('stopBtn').addEventListener('click', stopScan);
-
-    $('searchBtn').addEventListener('click', ()=>{
-      tryLookup($('manual').value);
-    });
-
-    $('manual').addEventListener('keydown', (e)=>{
-      if(e.key==='Enter') tryLookup($('manual').value);
-    });
-
-    $('clearBtn').addEventListener('click', ()=>{
-      localStorage.removeItem(LS_KEY);
-      localStorage.removeItem(LS_META);
-      db = null;
-      setDbStatus(false);
-      setResult('', '', '', '', 'Cache effacé. Recharge un Excel.');
-    });
-
-    // Auto restore
-    if(!restoreCache()){
-      setDbStatus(false);
-      setResult('', '', '', '', 'Charge un Excel, puis lance le scan.');
-    }
-
-  </script>
+document.getElementById("start").onclick=async()=>{
+ qr=new Html5Qrcode("reader");
+ try{
+  await qr.start(
+   { facingMode:"environment" },
+   { fps:10 },
+   txt=>{
+    let k=norm(txt);
+    let d=db.get(k)||db.get("V"+k)||db.get(k.replace(/^V/,""));
+    out(d ? k+" → "+d : "NON TROUVÉ");
+    qr.stop();
+   }
+  );
+ }catch(e){
+  alert("Caméra bloquée → Réglages iOS / Safari");
+  console.error(e);
+ }
+};
+</script>
 </body>
 </html>
