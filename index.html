@@ -50,11 +50,17 @@ file.onchange=async e=>{
  out('Base chargée');
 };
 
-start.onclick=async()=>{
- if(controls) try{controls.stop()}catch(e){}
- const devices=await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
- const id=devices.at(-1)?.deviceId;
- const hints=new Map();
+start.onclick = async () => {
+
+  // ✅ FORÇAGE PERMISSION iOS (critique)
+  try {
+    await primeCameraPermission();
+  } catch(e) {
+    alert("Accès caméra refusé");
+    return;
+  }
+
+  // ensuite SEULEMENT ZXing
  hints.set(ZXingBrowser.DecodeHintType.POSSIBLE_FORMATS,[ZXingBrowser.BarcodeFormat.CODE_128]);
  const reader=new ZXingBrowser.BrowserMultiFormatReader(hints);
  stop.disabled=false; start.disabled=true;
