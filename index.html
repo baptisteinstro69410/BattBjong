@@ -1,74 +1,27 @@
 <!doctype html>
 <html lang="fr">
-<head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BJONG Scan</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Camera Test iOS</title>
 
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<button id="btn" style="font-size:20px;padding:20px">
+  Tester caméra
+</button>
 
-<style>
-body{margin:0;font-family:-apple-system;background:#0b1220;color:#e8eefc;padding:12px}
-button{padding:12px 16px;font-size:16px;border-radius:10px;border:none}
-#reader{width:100%;height:60vh;background:#000;margin-top:10px}
-</style>
-</head>
-
-<body>
-
-<h2>BJONG Scan</h2>
-
-<input type="file" id="file" accept=".xlsx">
-<br><br>
-<button id="start">Démarrer le scan</button>
-
-<div id="reader"></div>
-<pre id="out"></pre>
-
-<!-- ✅ SCRIPTS CORRECTEMENT CHARGÉS -->
-<script src="https://unpkg.com/html5-qrcode@2.3.10/minified/html5-qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<video id="v" autoplay playsinline style="width:100%;height:60vh"></video>
 
 <script>
-let db=new Map(), qr;
-
-function norm(v){return String(v||"").trim().toUpperCase()}
-function out(t){document.getElementById("out").textContent=t}
-
-document.getElementById("file").onchange=async e=>{
- const buf=await e.target.files[0].arrayBuffer();
- const wb=XLSX.read(buf,{type:"array"});
- const ws=wb.Sheets[wb.SheetNames[0]];
- const rows=XLSX.utils.sheet_to_json(ws,{header:1});
- rows.slice(1).forEach(r=>{
-  if(r[0]) db.set(norm(r[0]), r[2]);
-  if(r[1]) db.set(norm(r[1]), r[2]);
- });
- out("Excel chargé");
-};
-
-document.getElementById("start").onclick=async()=>{
- out("Ouverture caméra…");
- qr=new Html5Qrcode("reader");
- try{
-  await qr.start(
-   {facingMode:"environment"},
-   {fps:10},
-   txt=>{
-    const k=norm(txt);
-    const d=db.get(k)||db.get("V"+k)||db.get(k.replace(/^V/,""));
-    out(d ? k+" → "+d : "NON TROUVÉ");
-    qr.stop();
-   }
-  );
- }catch(e){
-  out("ERREUR cam\u00E9ra");
-  alert("Caméra bloquée — vérifier Réglages iOS > Safari > Appareil photo");
-  console.error(e);
- }
+document.getElementById("btn").onclick = async () => {
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" }
+    });
+    document.getElementById("v").srcObject = s;
+    alert("✅ caméra OK");
+  } catch (e) {
+    alert("❌ caméra BLOQUÉE\n" + e.name);
+    console.error(e);
+  }
 };
 </script>
-
-</body>
 </html>
