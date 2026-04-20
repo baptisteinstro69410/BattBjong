@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <title>Scan BJONG - iPhone</title>
+  <title>Scan BJONG - iPhone (Rapide)</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -25,13 +25,13 @@
     body { min-height: 100vh; }
     .wrap { max-width: 720px; margin: 0 auto; padding: max(14px, env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom)); }
     .title { font-size: 1.45rem; font-weight: 750; margin: 0 0 6px; letter-spacing: .2px; }
-    .subtitle { color: var(--muted); margin: 0 0 16px; line-height: 1.35; }
+    .subtitle { color: var(--muted); margin: 0 0 14px; line-height: 1.35; }
     .card { background: rgba(17,24,39,.88); backdrop-filter: blur(8px); border: 1px solid rgba(148,163,184,.16); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); margin-bottom: 14px; }
     .video-wrap { position: relative; overflow: hidden; background: #000; border-radius: 16px; border: 1px solid rgba(148,163,184,.18); aspect-ratio: 3 / 4; }
     video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
     .guide { position: absolute; inset: 0; pointer-events: none; }
-    .guide::before { content: ''; position: absolute; left: 8%; right: 8%; top: 38%; height: 24%; border: 3px solid rgba(56, 189, 248, .92); border-radius: 16px; box-shadow: 0 0 0 9999px rgba(0,0,0,.18) inset; }
-    .guide::after { content: 'Code 128 uniquement'; position: absolute; left: 0; right: 0; top: 65%; text-align: center; font-size: .9rem; font-weight: 700; color: #e2e8f0; text-shadow: 0 2px 8px rgba(0,0,0,.65); }
+    .guide::before { content: ''; position: absolute; left: 6%; right: 6%; top: 40%; height: 18%; border: 3px solid rgba(56, 189, 248, .96); border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0,0,0,.18) inset; }
+    .guide::after { content: 'Centre le code barre ici'; position: absolute; left: 0; right: 0; top: 62%; text-align: center; font-size: .92rem; font-weight: 700; color: #e2e8f0; text-shadow: 0 2px 8px rgba(0,0,0,.65); }
     .status { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; width: 100%; background: rgba(15,23,42,.85); border: 1px solid rgba(148,163,184,.16); border-radius: 14px; padding: 10px 12px; color: var(--muted); line-height: 1.3; }
     .status-dot { width: 10px; height: 10px; border-radius: 999px; background: var(--warn); flex: 0 0 auto; }
     .status.ok .status-dot { background: var(--ok); }
@@ -53,23 +53,27 @@
     .v { font-weight: 700; word-break: break-all; }
     .manual { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 12px; }
     input[type='text'] { width: 100%; background: #0f172a; color: #f8fafc; border: 1px solid rgba(148,163,184,.2); border-radius: 14px; padding: 14px 14px; font-size: 16px; min-height: 52px; }
-    .hint, .meta { color: var(--muted); font-size: .92rem; line-height: 1.35; }
+    .hint, .meta, .tips { color: var(--muted); font-size: .92rem; line-height: 1.35; }
     .meta { margin-top: 10px; }
+    .tips { margin-top: 10px; }
     .pill { display: inline-block; padding: 6px 10px; border-radius: 999px; background: rgba(56,189,248,.12); border: 1px solid rgba(56,189,248,.18); color: #bae6fd; font-size: .84rem; margin-right: 6px; margin-bottom: 6px; }
     .footer-note { font-size: .88rem; color: var(--muted); margin-top: 10px; line-height: 1.35; }
+    .mode { font-size: .85rem; color: #bae6fd; margin-top: 8px; }
     code { background: rgba(148,163,184,.12); border-radius: 8px; padding: 2px 6px; }
+    canvas#scanCanvas { display:none; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <h1 class="title">Scan BJONG – recherche SN + date</h1>
-      <p class="subtitle">Application HTML mobile pour iPhone. Le scan est limité au format <strong>Code 128</strong>. La permission caméra iOS est demandée <strong>avant</strong> le chargement de ZXing.</p>
+      <h1 class="title">Scan BJONG – version plus rapide</h1>
+      <p class="subtitle">Optimisée pour améliorer la lecture sur iPhone : tentative en <strong>détection native</strong> d’abord, puis <strong>fallback ZXing</strong> si nécessaire. Recherche sur <strong>A ou B</strong>, format <strong>Code 128 uniquement</strong>.</p>
       <div>
         <span class="pill">Code 128</span>
-        <span class="pill">iPhone / Safari</span>
-        <span class="pill">Recherche sur A ou B</span>
+        <span class="pill">Mode natif si dispo</span>
+        <span class="pill">Fallback ZXing rapide</span>
       </div>
+      <div class="mode" id="modeBadge">Moteur : non démarré</div>
     </div>
 
     <div class="card">
@@ -77,6 +81,7 @@
         <video id="video" muted playsinline autoplay></video>
         <div class="guide"></div>
       </div>
+      <canvas id="scanCanvas"></canvas>
       <div id="status" class="status" role="status" aria-live="polite" style="margin-top:12px;">
         <span class="status-dot"></span>
         <span id="statusText">Prêt. Appuyez sur « Autoriser & scanner ».</span>
@@ -85,7 +90,10 @@
         <button id="btnStart" class="btn-primary">Autoriser & scanner</button>
         <button id="btnStop" class="btn-secondary" disabled>Arrêter</button>
       </div>
-      <p class="footer-note">Astuce iPhone : ouvrez cette page dans <strong>Safari</strong> et hébergez-la en <strong>HTTPS</strong> (ou <code>localhost</code>). L’ouverture directe depuis l’app Fichiers peut bloquer la caméra.</p>
+      <div class="tips">
+        Pour accélérer la lecture : placez le code bien à plat, horizontal, et remplissez au maximum le cadre bleu sans couper les bords.
+      </div>
+      <p class="footer-note">Safari iPhone : ouvrez la page en <strong>HTTPS</strong> (ou <code>localhost</code>) pour autoriser la caméra.</p>
     </div>
 
     <div class="card">
@@ -93,7 +101,7 @@
         <input id="manualInput" type="text" inputmode="latin" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Saisir ou coller un SN / code barre" />
         <button id="btnSearch" class="btn-ghost">Rechercher</button>
       </div>
-      <p class="hint">La recherche essaie d’abord la valeur exacte, puis la variante avec / sans préfixe <code>V</code>.</p>
+      <p class="hint">La recherche essaie la valeur exacte, puis la variante avec / sans préfixe <code>V</code>.</p>
       <div id="result" class="result" style="display:none;"></div>
       <div class="meta" id="meta"></div>
     </div>
@@ -112,14 +120,21 @@
     const btnSearch = document.getElementById('btnSearch');
     const manualInput = document.getElementById('manualInput');
     const metaEl = document.getElementById('meta');
+    const modeBadgeEl = document.getElementById('modeBadge');
+    const scanCanvas = document.getElementById('scanCanvas');
+    const scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true });
 
     let permissionPrimed = false;
     let zxingLoaded = false;
     let codeReader = null;
     let controls = null;
     let activeStream = null;
+    let nativeDetector = null;
+    let nativeLoopTimer = null;
+    let isScanning = false;
     let lastDecodedText = '';
     let lastDecodedAt = 0;
+    let currentEngine = 'Aucun';
 
     metaEl.textContent = `Base embarquée : ${APP_STATS.rows} lignes (${APP_STATS.sourceSheet}) · ${APP_STATS.keys} clés de recherche`;
 
@@ -129,6 +144,11 @@
       if (mode === 'ok') statusEl.classList.add('ok');
       if (mode === 'bad') statusEl.classList.add('bad');
       if (mode === 'scan') statusEl.classList.add('scan');
+    }
+
+    function setMode(label) {
+      currentEngine = label;
+      modeBadgeEl.textContent = `Moteur : ${label}`;
     }
 
     function escapeHtml(text) {
@@ -174,6 +194,7 @@
             <div class="k">SN</div><div class="v">${escapeHtml(found.sn)}</div>
             <div class="k">Date</div><div class="v">${escapeHtml(found.date)}</div>
             <div class="k">Trouvé via</div><div class="v">colonne ${escapeHtml(found.matchedIn)}${found.matchedIn === 'A' ? ' (NS)' : ' (NS (V))'}</div>
+            <div class="k">Moteur</div><div class="v">${escapeHtml(currentEngine)}</div>
           </div>`;
         setStatus(`Trouvé : ${found.sn} · ${found.date}`, 'ok');
       } else {
@@ -183,6 +204,7 @@
           <div class="kv">
             <div class="k">Code lu</div><div class="v">${escapeHtml(raw)}</div>
             <div class="k">Recherche</div><div class="v">Aucune valeur trouvée dans les colonnes A ou B</div>
+            <div class="k">Moteur</div><div class="v">${escapeHtml(currentEngine)}</div>
           </div>`;
         setStatus('Aucune correspondance trouvée.', 'bad');
       }
@@ -198,17 +220,17 @@
         video: {
           facingMode: { ideal: 'environment' },
           width: { ideal: 1280 },
-          height: { ideal: 720 }
+          height: { ideal: 720 },
+          frameRate: { ideal: 30, max: 60 }
         }
       });
-      // Amorçage iOS : attacher le flux, lancer la vidéo, puis arrêter le flux avant ZXing.
       activeStream = stream;
       videoEl.srcObject = stream;
       await videoEl.play().catch(() => null);
-      await new Promise(resolve => setTimeout(resolve, 250));
+      await new Promise(resolve => setTimeout(resolve, 200));
       stopActiveStream();
       permissionPrimed = true;
-      setStatus('Permission caméra accordée. Chargement du moteur de scan…', 'ok');
+      setStatus('Permission caméra accordée.', 'ok');
     }
 
     function stopActiveStream() {
@@ -224,6 +246,108 @@
       } catch (_) {}
       activeStream = null;
       videoEl.srcObject = null;
+    }
+
+    async function optimizeTrack(track) {
+      if (!track || typeof track.applyConstraints !== 'function') return;
+      const tries = [
+        { advanced: [{ focusMode: 'continuous' }] },
+        { advanced: [{ exposureMode: 'continuous' }] },
+        { advanced: [{ whiteBalanceMode: 'continuous' }] },
+        { frameRate: { ideal: 30, max: 60 } }
+      ];
+      for (const c of tries) {
+        try { await track.applyConstraints(c); } catch (_) {}
+      }
+    }
+
+    async function startPreviewStream() {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30, max: 60 }
+        }
+      });
+      activeStream = stream;
+      videoEl.srcObject = stream;
+      await videoEl.play().catch(() => null);
+      const [track] = stream.getVideoTracks();
+      if (track) await optimizeTrack(track);
+      return stream;
+    }
+
+    function clearNativeLoop() {
+      if (nativeLoopTimer) {
+        clearTimeout(nativeLoopTimer);
+        nativeLoopTimer = null;
+      }
+    }
+
+    function getScanRoi() {
+      const vw = videoEl.videoWidth || 0;
+      const vh = videoEl.videoHeight || 0;
+      if (!vw || !vh) return null;
+      const roiWidth = Math.round(vw * 0.88);
+      const roiHeight = Math.round(vh * 0.24);
+      const x = Math.round((vw - roiWidth) / 2);
+      const y = Math.round((vh - roiHeight) / 2);
+      return { x, y, w: roiWidth, h: roiHeight };
+    }
+
+    async function canUseNativeBarcodeDetector() {
+      if (!('BarcodeDetector' in window)) return false;
+      try {
+        if (typeof window.BarcodeDetector.getSupportedFormats === 'function') {
+          const formats = await window.BarcodeDetector.getSupportedFormats();
+          return Array.isArray(formats) && formats.includes('code_128');
+        }
+        return true;
+      } catch (_) {
+        return true;
+      }
+    }
+
+    function handleDecodedText(text) {
+      const now = Date.now();
+      if (!text) return false;
+      if (text === lastDecodedText && (now - lastDecodedAt) < 1200) return false;
+      lastDecodedText = text;
+      lastDecodedAt = now;
+      if (navigator.vibrate) navigator.vibrate(120);
+      renderResult(text);
+      stopScanner();
+      return true;
+    }
+
+    async function nativeScanLoop() {
+      if (!isScanning || !nativeDetector || !videoEl.srcObject) return;
+      if (videoEl.readyState < 2) {
+        nativeLoopTimer = setTimeout(nativeScanLoop, 60);
+        return;
+      }
+      const roi = getScanRoi();
+      if (!roi) {
+        nativeLoopTimer = setTimeout(nativeScanLoop, 60);
+        return;
+      }
+      scanCanvas.width = roi.w;
+      scanCanvas.height = roi.h;
+      scanCtx.drawImage(videoEl, roi.x, roi.y, roi.w, roi.h, 0, 0, roi.w, roi.h);
+      try {
+        const barcodes = await nativeDetector.detect(scanCanvas);
+        if (barcodes && barcodes.length) {
+          const hit = barcodes.find(b => !b.format || b.format === 'code_128') || barcodes[0];
+          if (hit && hit.rawValue) {
+            if (handleDecodedText(hit.rawValue)) return;
+          }
+        }
+      } catch (err) {
+        console.warn('Native detector error', err);
+      }
+      nativeLoopTimer = setTimeout(nativeScanLoop, 45);
     }
 
     async function loadZXing() {
@@ -251,64 +375,86 @@
       });
     }
 
+    async function startNativeScanner() {
+      setMode('Natif');
+      setStatus('Scanner natif actif…', 'scan');
+      await startPreviewStream();
+      nativeDetector = new window.BarcodeDetector({ formats: ['code_128'] });
+      btnStop.disabled = false;
+      nativeScanLoop();
+    }
+
+    async function startZXingScanner() {
+      setMode('ZXing');
+      await loadZXing();
+      setStatus('Scanner ZXing actif…', 'scan');
+      btnStop.disabled = false;
+      lastDecodedText = '';
+      lastDecodedAt = 0;
+      const hints = new Map();
+      hints.set(window.ZXing.DecodeHintType.POSSIBLE_FORMATS, [window.ZXing.BarcodeFormat.CODE_128]);
+      codeReader = new window.ZXing.BrowserMultiFormatReader(hints, 80);
+      controls = await codeReader.decodeFromConstraints(
+        {
+          audio: false,
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 960 },
+            height: { ideal: 540 },
+            frameRate: { ideal: 30, max: 60 }
+          }
+        },
+        videoEl,
+        async (result, err, ctl) => {
+          if (ctl && !controls) controls = ctl;
+          const track = videoEl.srcObject && videoEl.srcObject.getVideoTracks ? videoEl.srcObject.getVideoTracks()[0] : null;
+          if (track) optimizeTrack(track);
+          if (result) {
+            const text = typeof result.getText === 'function' ? result.getText() : String(result.text || result);
+            handleDecodedText(text);
+          } else if (err && err.name && err.name !== 'NotFoundException') {
+            console.warn(err);
+          }
+        }
+      );
+    }
+
     async function startScanner() {
       if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
         throw new Error('La caméra iPhone exige HTTPS ou localhost.');
       }
       btnStart.disabled = true;
+      resultEl.style.display = 'none';
+      resultEl.innerHTML = '';
       try {
         if (!permissionPrimed) {
           await primeCameraPermissionIOS();
         }
-        await loadZXing();
-        setStatus('Scanner actif… visez un code barre Code 128.', 'scan');
-        btnStop.disabled = false;
+        isScanning = true;
         lastDecodedText = '';
         lastDecodedAt = 0;
-
-        const hints = new Map();
-        hints.set(window.ZXing.DecodeHintType.POSSIBLE_FORMATS, [window.ZXing.BarcodeFormat.CODE_128]);
-        codeReader = new window.ZXing.BrowserMultiFormatReader(hints, 300);
-
-        controls = await codeReader.decodeFromConstraints(
-          {
-            audio: false,
-            video: {
-              facingMode: { ideal: 'environment' },
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }
-          },
-          videoEl,
-          (result, err, ctl) => {
-            if (ctl && !controls) controls = ctl;
-            if (result) {
-              const text = typeof result.getText === 'function' ? result.getText() : String(result.text || result);
-              const now = Date.now();
-              if (text === lastDecodedText && (now - lastDecodedAt) < 1800) return;
-              lastDecodedText = text;
-              lastDecodedAt = now;
-              if (navigator.vibrate) navigator.vibrate(120);
-              renderResult(text);
-              stopScanner();
-            } else if (err && err.name && err.name !== 'NotFoundException') {
-              console.warn(err);
-            }
-          }
-        );
+        if (await canUseNativeBarcodeDetector()) {
+          await startNativeScanner();
+        } else {
+          await startZXingScanner();
+        }
       } catch (error) {
         console.error(error);
         setStatus(error.message || 'Erreur de démarrage du scanner.', 'bad');
+        stopScanner();
       } finally {
         btnStart.disabled = false;
       }
     }
 
     function stopScanner() {
+      isScanning = false;
+      clearNativeLoop();
       try { if (controls && typeof controls.stop === 'function') controls.stop(); } catch (_) {}
       try { if (codeReader && typeof codeReader.reset === 'function') codeReader.reset(); } catch (_) {}
       controls = null;
       codeReader = null;
+      nativeDetector = null;
       stopActiveStream();
       btnStop.disabled = true;
       if (!resultEl.innerHTML) setStatus('Scan arrêté.', 'ok');
@@ -323,6 +469,7 @@
         setStatus('Saisissez un SN ou un code barre avant la recherche.', 'bad');
         return;
       }
+      setMode('Recherche manuelle');
       renderResult(value);
     });
 
