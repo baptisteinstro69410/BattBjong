@@ -1,6 +1,6 @@
 {
-  "name": "BJONG Scan",
-  "short_name": "BJONG Scan",
+  "name": "BJONG Scan Code 128",
+  "short_name": "BJONG128",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#0b1220",

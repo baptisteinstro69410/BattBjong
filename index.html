@@ -1,334 +1,65 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>BJONG Scan</title>
-
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#0b1220" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-
-  <style>
-    :root{--bg:#0b1220;--card:#111a2e;--txt:#e8eefc;--muted:#aab8de;--ok:#1ad17a;--ko:#ff5c5c;--acc:#6aa6ff;}
-    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#081022,#0b1220);color:var(--txt);}
-    .wrap{max-width:980px;margin:0 auto;padding:16px 14px 34px;}
-    h1{font-size:20px;margin:10px 0 12px;}
-    .grid{display:grid;grid-template-columns:1fr;gap:12px;}
-    @media(min-width:880px){.grid{grid-template-columns:380px 1fr;}}
-    .card{background:rgba(17,26,46,.92);border:1px solid rgba(106,166,255,.18);border-radius:14px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.35);}
-    label{display:block;font-size:13px;color:var(--muted);margin:6px 0;}
-    input[type=file],input[type=text]{width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(170,184,222,.25);background:#0c1427;color:var(--txt);}
-    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
-    button{appearance:none;border:0;border-radius:12px;padding:10px 14px;background:var(--acc);color:#071022;font-weight:800;cursor:pointer;}
-    button.secondary{background:transparent;border:1px solid rgba(106,166,255,.45);color:var(--txt);}
-    button.danger{background:var(--ko);color:#260707;}
-    .hint{font-size:12px;color:var(--muted);line-height:1.45;margin-top:6px;}
-    .status{padding:10px 12px;border-radius:12px;border:1px solid rgba(170,184,222,.18);background:rgba(12,20,39,.9);}
-    .status.ok{border-color:rgba(26,209,122,.45);} .status.ko{border-color:rgba(255,92,92,.45);}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;}
-    .kv{display:grid;grid-template-columns:150px 1fr;gap:6px 10px;align-items:center;}
-    .kv div:nth-child(odd){color:var(--muted);font-size:13px;}
-    .camwrap{position:relative;border-radius:14px;overflow:hidden;border:1px solid rgba(170,184,222,.20);background:#000;}
-    video{width:100%;height:auto;display:block;}
-    .overlay{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center;}
-    .reticle{width:72%;height:44%;border:2px solid rgba(106,166,255,.8);border-radius:14px;box-shadow:0 0 0 2000px rgba(0,0,0,.25) inset;}
-    .pill{display:inline-block;padding:3px 10px;border-radius:999px;border:1px solid rgba(170,184,222,.22);font-size:12px;color:var(--muted);}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>BJONG Scan – Code 128</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0b1220" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<style>
+body{margin:0;font-family:-apple-system;background:#0b1220;color:#e8eefc;padding:14px}
+button{padding:12px 16px;font-size:16px;border-radius:10px;border:none}
+#reader video{width:100%;border-radius:12px}
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Scan code-barres → Recherche dans Excel</h1>
+<h2>BJONG Scan – Code 128 uniquement</h2>
+<input type="file" id="file" accept=".xlsx"><br><br>
+<button id="start">Démarrer le scan</button>
+<button id="stop" disabled>Stop</button>
+<div id="reader"><video id="video" playsinline muted autoplay></video></div>
+<pre id="out"></pre>
 
-    <div class="grid">
-      <div class="card">
-        <label>1) Charger la base (Excel .xlsx)</label>
-        <input id="fileInput" type="file" accept=".xlsx" />
-        <div class="hint">Tout reste local. Colonnes attendues : A=NS, B=NS (V), C=DATE (ou détection par en-têtes).</div>
+<script src="https://unpkg.com/@zxing/browser@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+let db=new Map(), controls=null;
+const out=t=>document.getElementById('out').textContent=t;
+const norm=v=>String(v||'').trim().toUpperCase();
 
-        <div style="margin-top:12px" class="status" id="dbStatus">
-          <div><span class="pill" id="dbPill">Base non chargée</span></div>
-          <div class="hint" id="dbHint">Charge un fichier Excel pour activer la recherche.</div>
-          <div class="hint mono" id="libHint">Libs…</div>
-        </div>
+file.onchange=async e=>{
+ const buf=await e.target.files[0].arrayBuffer();
+ const wb=XLSX.read(buf,{type:'array'});
+ const ws=wb.Sheets[wb.SheetNames[0]];
+ XLSX.utils.sheet_to_json(ws,{header:1}).slice(1).forEach(r=>{
+  if(r[0]) db.set(norm(r[0]), r[2]);
+  if(r[1]) db.set(norm(r[1]), r[2]);
+ });
+ out('Base chargée');
+};
 
-        <label style="margin-top:12px">2) Scanner (ou saisie)</label>
-        <div class="row">
-          <button id="startBtn">Démarrer le scan</button>
-          <button id="stopBtn" class="secondary" disabled>Stop</button>
-        </div>
+start.onclick=async()=>{
+ if(controls) try{controls.stop()}catch(e){}
+ const devices=await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+ const id=devices.at(-1)?.deviceId;
+ const hints=new Map();
+ hints.set(ZXingBrowser.DecodeHintType.POSSIBLE_FORMATS,[ZXingBrowser.BarcodeFormat.CODE_128]);
+ const reader=new ZXingBrowser.BrowserMultiFormatReader(hints);
+ stop.disabled=false; start.disabled=true;
+ controls=await reader.decodeFromVideoDevice(id, video,(res,err,ctrl)=>{
+  if(res){
+   const k=norm(res.text||res.getText());
+   const d=db.get(k)||db.get('V'+k)||db.get(k.replace(/^V/,''));
+   out(d?`${k} → ${d}`:`${k} → NON TROUVÉ`);
+   ctrl.stop(); controls=null;
+   start.disabled=false; stop.disabled=true;
+  }
+ });
+};
 
-        <div style="margin-top:10px"></div>
-        <input id="manual" type="text" placeholder="Saisie manuelle (ex: 2021000128930 ou V2021000128930)" />
-        <div class="row" style="margin-top:10px">
-          <button id="searchBtn" class="secondary">Rechercher</button>
-          <button id="clearBtn" class="danger">Effacer cache</button>
-        </div>
-
-        <div class="hint" style="margin-top:10px">
-          <b>Note iPhone :</b> si tu ouvres depuis un aperçu (Teams/Outlook/OneDrive), la caméra peut être bloquée. Ouvre dans Safari.
-        </div>
-      </div>
-
-      <div class="card">
-        <label>Caméra</label>
-        <div class="camwrap">
-          <video id="video" playsinline muted autoplay></video>
-          <div class="overlay"><div class="reticle"></div></div>
-        </div>
-
-        <div style="margin-top:12px" class="status" id="resultBox">
-          <div class="kv">
-            <div>Dernier code</div><div class="mono" id="lastCode">—</div>
-            <div>Statut</div><div id="statusText">—</div>
-            <div>SN trouvé</div><div class="mono" id="snFound">—</div>
-            <div>Date</div><div class="mono" id="dateFound">—</div>
-          </div>
-          <div class="hint mono" id="debug">—</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ZXing Browser (UMD) : via unpkg (recommandé par la doc) -->
-  <script src="https://unpkg.com/@zxing/browser@latest"></script>
-  <!-- XLSX -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
-  <script>
-    const LS_KEY = 'bjong_scan_db_zxing_v1';
-    const LS_META = 'bjong_scan_meta_zxing_v1';
-
-    let db = null; // Map(normalizedSN -> {sn, date})
-    let controls = null; // ZXing scanner controls
-
-    const $ = id => document.getElementById(id);
-
-    function normalizeSN(s){
-      if(!s && s!==0) return '';
-      return String(s).trim().replace(/\s+/g,'').toUpperCase();
-    }
-
-    function toDisplayDate(v){
-      if(v==null || v==='') return '';
-      if(v instanceof Date && !isNaN(v)) return v.toLocaleString('fr-FR');
-      if(typeof v === 'number' && typeof XLSX !== 'undefined'){
-        const d = XLSX.SSF.parse_date_code(v);
-        if(d){
-          const dt = new Date(d.y, d.m-1, d.d, d.H||0, d.M||0, Math.floor(d.S||0));
-          return dt.toLocaleString('fr-FR');
-        }
-      }
-      return String(v);
-    }
-
-    function setDbStatus(loaded, metaText=''){
-      const box = $('dbStatus');
-      const pill = $('dbPill');
-      const hint = $('dbHint');
-      if(loaded){
-        box.classList.add('ok'); box.classList.remove('ko');
-        pill.textContent = 'Base chargée';
-        hint.textContent = metaText || `Entrées: ${db ? db.size : 0}`;
-      } else {
-        box.classList.remove('ok'); box.classList.add('ko');
-        pill.textContent = 'Base non chargée';
-        hint.textContent = 'Charge un fichier Excel pour activer la recherche.';
-      }
-    }
-
-    function setResult(state, code, sn, date, statusHint){
-      $('lastCode').textContent = code || '—';
-      if(state==='ok'){
-        $('resultBox').classList.add('ok'); $('resultBox').classList.remove('ko');
-        $('statusText').textContent = statusHint || 'Trouvé';
-      } else if(state==='ko'){
-        $('resultBox').classList.add('ko'); $('resultBox').classList.remove('ok');
-        $('statusText').textContent = statusHint || 'Non trouvé';
-      } else {
-        $('resultBox').classList.remove('ok'); $('resultBox').classList.remove('ko');
-        $('statusText').textContent = '—';
-      }
-      $('snFound').textContent = sn || '—';
-      $('dateFound').textContent = date || '—';
-    }
-
-    function logDebug(msg){ $('debug').textContent = msg; }
-
-    function tryLookup(raw){
-      const code = normalizeSN(raw);
-      if(!code){
-        setResult('ko', raw, '', '', 'SN vide');
-        return;
-      }
-      if(!db){
-        setResult('ko', code, '', '', 'Base non chargée');
-        return;
-      }
-      let hit = db.get(code);
-      if(!hit){
-        if(code.startsWith('V')) hit = db.get(code.substring(1));
-        else hit = db.get('V'+code);
-      }
-      if(hit){
-        setResult('ok', code, hit.sn, hit.date, 'Trouvé');
-      } else {
-        setResult('ko', code, '', '', 'Non trouvé');
-      }
-    }
-
-    function buildDbFromWorksheet(ws){
-      const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true});
-      if(!rows || rows.length===0) return new Map();
-
-      const header = (rows[0]||[]).map(h=>normalizeSN(h));
-      let colA=0, colB=1, colC=2;
-      const idxNS = header.findIndex(h => h==='NS' || h==='SN' || h==='NSBATTERIE');
-      const idxNSV = header.findIndex(h => h==='NS(V)' || h==='NS(V)');
-      const idxDATE = header.findIndex(h => h==='DATE' || h==='HEUREDEDÉBUT' || h==='HEUREDEDEBUT');
-      if(idxNS>=0) colA=idxNS;
-      if(idxNSV>=0) colB=idxNSV;
-      if(idxDATE>=0) colC=idxDATE;
-
-      const map = new Map();
-      for(let r=1;r<rows.length;r++){
-        const row = rows[r] || [];
-        const a = normalizeSN(row[colA]);
-        const b = normalizeSN(row[colB]);
-        const date = toDisplayDate(row[colC]);
-        if(a) map.set(a, {sn:a, date});
-        if(b) map.set(b, {sn:b, date});
-      }
-      return map;
-    }
-
-    async function loadExcelFile(file){
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, {type:'array'});
-      // Feuille "Feuil1" si dispo sinon 1ère
-      const prefer = ['Feuil1','Sheet1'];
-      const sheetName = wb.SheetNames.find(n => prefer.includes(n)) || wb.SheetNames[0];
-      const ws = wb.Sheets[sheetName];
-      db = buildDbFromWorksheet(ws);
-
-      const meta = {name:file.name, lastModified:file.lastModified, sheet:sheetName, size:db.size};
-      localStorage.setItem(LS_KEY, JSON.stringify(Array.from(db.entries())));
-      localStorage.setItem(LS_META, JSON.stringify(meta));
-
-      setDbStatus(true, `${meta.name} • feuille: ${meta.sheet} • entrées: ${meta.size}`);
-      setResult('', '', '', '', 'Base chargée');
-    }
-
-    function restoreCache(){
-      try{
-        const raw = localStorage.getItem(LS_KEY);
-        if(!raw) return false;
-        db = new Map(JSON.parse(raw));
-        const meta = JSON.parse(localStorage.getItem(LS_META) || '{}');
-        setDbStatus(true, `${meta.name||'Excel'} • feuille: ${meta.sheet||'?'} • entrées: ${meta.size||db.size}`);
-        setResult('', '', '', '', 'Base restaurée');
-        return true;
-      } catch(e){
-        return false;
-      }
-    }
-
-    function updateLibHint(){
-      const okZX = (typeof ZXingBrowser !== 'undefined');
-      const okXLSX = (typeof XLSX !== 'undefined');
-      $('libHint').textContent = `ZXingBrowser: ${okZX?'OK':'KO'} • XLSX: ${okXLSX?'OK':'KO'}`;
-    }
-
-    async function startScan(){
-      if(typeof ZXingBrowser === 'undefined'){
-        alert('ZXingBrowser non chargé (réseau/CDN)');
-        return;
-      }
-      if(controls){
-        try{ controls.stop(); }catch(e){}
-        controls = null;
-      }
-
-      $('startBtn').disabled = true;
-      $('stopBtn').disabled = false;
-
-      const videoEl = $('video');
-      logDebug('Initialisation caméra…');
-
-      try{
-        // Liste des caméras (recommandé par la doc)
-        const devices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
-        const selectedDeviceId = (devices && devices.length) ? devices[devices.length-1].deviceId : undefined; // souvent caméra arrière
-
-        const codeReader = new ZXingBrowser.BrowserMultiFormatReader();
-
-        // Démarrage scan continu (signature conforme aux exemples doc)
-        controls = await codeReader.decodeFromVideoDevice(
-          selectedDeviceId,
-          videoEl,
-          (result, error, ctrl) => {
-            if(result){
-              const text = (result.text) ? result.text : (result.getText ? result.getText() : String(result));
-              $('lastCode').textContent = text;
-              tryLookup(text);
-              // stop after first success
-              try{ (ctrl||controls).stop(); }catch(e){}
-              controls = null;
-              $('startBtn').disabled = false;
-              $('stopBtn').disabled = true;
-              logDebug('Scan OK.');
-            }
-          }
-        );
-
-        logDebug('Scan en cours…');
-
-      } catch(e){
-        logDebug('Erreur scan: ' + (e && e.name ? e.name : e));
-        $('startBtn').disabled = false;
-        $('stopBtn').disabled = true;
-      }
-    }
-
-    function stopScan(){
-      if(controls){
-        try{ controls.stop(); }catch(e){}
-        controls = null;
-      }
-      try{ const v=$('video'); v.pause(); v.srcObject=null; }catch(e){}
-      $('startBtn').disabled = false;
-      $('stopBtn').disabled = true;
-      logDebug('Scan stoppé.');
-    }
-
-    // Bindings
-    $('fileInput').addEventListener('change', (e)=>{
-      const f = e.target.files && e.target.files[0];
-      if(f) loadExcelFile(f);
-    });
-
-    $('startBtn').addEventListener('click', startScan);
-    $('stopBtn').addEventListener('click', stopScan);
-    $('searchBtn').addEventListener('click', ()=>tryLookup($('manual').value));
-    $('manual').addEventListener('keydown', (e)=>{ if(e.key==='Enter') tryLookup($('manual').value); });
-
-    $('clearBtn').addEventListener('click', ()=>{
-      localStorage.removeItem(LS_KEY);
-      localStorage.removeItem(LS_META);
-      db = null;
-      setDbStatus(false);
-      setResult('', '', '', '', 'Cache effacé');
-      logDebug('Cache effacé.');
-    });
-
-    // Init
-    updateLibHint();
-    if(!restoreCache()){
-      setDbStatus(false);
-      setResult('', '', '', '', 'Charge un Excel puis scanne.');
-    }
-    setTimeout(updateLibHint, 1200);
-  </script>
+stop.onclick=()=>{ if(controls){controls.stop();controls=null;} start.disabled=false; stop.disabled=true; }
+</script>
 </body>
 </html>
