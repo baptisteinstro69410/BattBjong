@@ -1,238 +1,341 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>BJONG Scan – Code 128</title>
-
-  <meta name="theme-color" content="#0b1220" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>Scan BJONG - iPhone</title>
   <style>
-    :root{--bg:#0b1220;--card:#111a2e;--txt:#e8eefc;--muted:#aab8de;--ok:#1ad17a;--ko:#ff5c5c;--acc:#6aa6ff;}
-    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#081022,#0b1220);color:var(--txt);}
-    .wrap{max-width:900px;margin:0 auto;padding:16px 14px 34px;}
-    h1{font-size:20px;margin:10px 0 12px;}
-    .card{background:rgba(17,26,46,.92);border:1px solid rgba(106,166,255,.18);border-radius:14px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.35);}
-    label{display:block;font-size:13px;color:var(--muted);margin:6px 0;}
-    input[type=file],input[type=text]{width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(170,184,222,.25);background:#0c1427;color:var(--txt);}
-    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
-    button{appearance:none;border:0;border-radius:12px;padding:10px 14px;background:var(--acc);color:#071022;font-weight:800;cursor:pointer;}
-    button.secondary{background:transparent;border:1px solid rgba(106,166,255,.45);color:var(--txt);}
-    button:disabled{opacity:.55;cursor:not-allowed;}
-    .status{margin-top:12px;padding:10px 12px;border-radius:12px;border:1px solid rgba(170,184,222,.18);background:rgba(12,20,39,.9);}
-    .status.ok{border-color:rgba(26,209,122,.45);} .status.ko{border-color:rgba(255,92,92,.45);}
-    .hint{font-size:12px;color:var(--muted);line-height:1.45;margin-top:6px;}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;}
-    .camwrap{position:relative;margin-top:12px;border-radius:14px;overflow:hidden;border:1px solid rgba(170,184,222,.20);background:#000;}
-    video{width:100%;height:auto;display:block;}
-    .overlay{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center;}
-    .reticle{width:72%;height:44%;border:2px solid rgba(106,166,255,.8);border-radius:14px;box-shadow:0 0 0 2000px rgba(0,0,0,.25) inset;}
+    :root {
+      --bg: #0f172a;
+      --card: #111827;
+      --line: #334155;
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --accent: #38bdf8;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --shadow: 0 10px 30px rgba(0,0,0,.28);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: linear-gradient(180deg, #0b1220 0%, #0f172a 100%); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    body { min-height: 100vh; }
+    .wrap { max-width: 720px; margin: 0 auto; padding: max(14px, env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom)); }
+    .title { font-size: 1.45rem; font-weight: 750; margin: 0 0 6px; letter-spacing: .2px; }
+    .subtitle { color: var(--muted); margin: 0 0 16px; line-height: 1.35; }
+    .card { background: rgba(17,24,39,.88); backdrop-filter: blur(8px); border: 1px solid rgba(148,163,184,.16); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); margin-bottom: 14px; }
+    .video-wrap { position: relative; overflow: hidden; background: #000; border-radius: 16px; border: 1px solid rgba(148,163,184,.18); aspect-ratio: 3 / 4; }
+    video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
+    .guide { position: absolute; inset: 0; pointer-events: none; }
+    .guide::before { content: ''; position: absolute; left: 8%; right: 8%; top: 38%; height: 24%; border: 3px solid rgba(56, 189, 248, .92); border-radius: 16px; box-shadow: 0 0 0 9999px rgba(0,0,0,.18) inset; }
+    .guide::after { content: 'Code 128 uniquement'; position: absolute; left: 0; right: 0; top: 65%; text-align: center; font-size: .9rem; font-weight: 700; color: #e2e8f0; text-shadow: 0 2px 8px rgba(0,0,0,.65); }
+    .status { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; width: 100%; background: rgba(15,23,42,.85); border: 1px solid rgba(148,163,184,.16); border-radius: 14px; padding: 10px 12px; color: var(--muted); line-height: 1.3; }
+    .status-dot { width: 10px; height: 10px; border-radius: 999px; background: var(--warn); flex: 0 0 auto; }
+    .status.ok .status-dot { background: var(--ok); }
+    .status.bad .status-dot { background: var(--bad); }
+    .status.scan .status-dot { background: var(--accent); animation: pulse 1.1s infinite; }
+    @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.35); opacity: .65; } 100% { transform: scale(1); opacity: 1; } }
+    .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    button { appearance: none; border: 0; border-radius: 14px; padding: 14px 16px; font-weight: 750; font-size: 1rem; cursor: pointer; min-height: 52px; }
+    .btn-primary { background: linear-gradient(180deg, #38bdf8 0%, #0ea5e9 100%); color: #082f49; }
+    .btn-secondary { background: #334155; color: #f8fafc; }
+    .btn-ghost { background: #1e293b; color: #e2e8f0; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .result { margin-top: 10px; border-radius: 16px; border: 1px solid rgba(148,163,184,.16); background: rgba(15,23,42,.9); padding: 14px; }
+    .result.ok { border-color: rgba(34,197,94,.45); background: rgba(6,95,70,.16); }
+    .result.bad { border-color: rgba(239,68,68,.45); background: rgba(127,29,29,.16); }
+    .result h2 { margin: 0 0 8px; font-size: 1.1rem; }
+    .kv { display: grid; grid-template-columns: 120px 1fr; gap: 8px 10px; align-items: start; }
+    .k { color: var(--muted); font-size: .94rem; }
+    .v { font-weight: 700; word-break: break-all; }
+    .manual { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 12px; }
+    input[type='text'] { width: 100%; background: #0f172a; color: #f8fafc; border: 1px solid rgba(148,163,184,.2); border-radius: 14px; padding: 14px 14px; font-size: 16px; min-height: 52px; }
+    .hint, .meta { color: var(--muted); font-size: .92rem; line-height: 1.35; }
+    .meta { margin-top: 10px; }
+    .pill { display: inline-block; padding: 6px 10px; border-radius: 999px; background: rgba(56,189,248,.12); border: 1px solid rgba(56,189,248,.18); color: #bae6fd; font-size: .84rem; margin-right: 6px; margin-bottom: 6px; }
+    .footer-note { font-size: .88rem; color: var(--muted); margin-top: 10px; line-height: 1.35; }
+    code { background: rgba(148,163,184,.12); border-radius: 8px; padding: 2px 6px; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>BJONG Scan – <span class="mono">CODE 128</span> uniquement</h1>
+    <div class="card">
+      <h1 class="title">Scan BJONG – recherche SN + date</h1>
+      <p class="subtitle">Application HTML mobile pour iPhone. Le scan est limité au format <strong>Code 128</strong>. La permission caméra iOS est demandée <strong>avant</strong> le chargement de ZXing.</p>
+      <div>
+        <span class="pill">Code 128</span>
+        <span class="pill">iPhone / Safari</span>
+        <span class="pill">Recherche sur A ou B</span>
+      </div>
+    </div>
 
     <div class="card">
-      <label>1) Charger le fichier Excel (.xlsx)</label>
-      <input id="fileInput" type="file" accept=".xlsx" />
-      <div class="hint">Recherche SN dans colonne A (NS) ou B (NS (V)), affiche la DATE (colonne C). Tolérance automatique avec/sans préfixe <span class="mono">V</span>.</div>
-
-      <div class="status" id="dbStatus">
-        <div class="hint" id="dbHint">Base non chargée.</div>
-        <div class="hint mono" id="libHint">ZXingBrowser: … • XLSX: …</div>
+      <div class="video-wrap">
+        <video id="video" muted playsinline autoplay></video>
+        <div class="guide"></div>
       </div>
-
-      <label style="margin-top:12px">2) Scanner (Code 128)</label>
-      <div class="row">
-        <button id="startBtn">Démarrer le scan</button>
-        <button id="stopBtn" class="secondary" disabled>Stop</button>
+      <div id="status" class="status" role="status" aria-live="polite" style="margin-top:12px;">
+        <span class="status-dot"></span>
+        <span id="statusText">Prêt. Appuyez sur « Autoriser & scanner ».</span>
       </div>
-
-      <div class="camwrap">
-        <video id="video" playsinline muted autoplay></video>
-        <div class="overlay"><div class="reticle"></div></div>
+      <div class="btns">
+        <button id="btnStart" class="btn-primary">Autoriser & scanner</button>
+        <button id="btnStop" class="btn-secondary" disabled>Arrêter</button>
       </div>
+      <p class="footer-note">Astuce iPhone : ouvrez cette page dans <strong>Safari</strong> et hébergez-la en <strong>HTTPS</strong> (ou <code>localhost</code>). L’ouverture directe depuis l’app Fichiers peut bloquer la caméra.</p>
+    </div>
 
-      <div class="status" id="resultBox">
-        <div><b>Dernier code :</b> <span class="mono" id="lastCode">—</span></div>
-        <div><b>Résultat :</b> <span class="mono" id="result">—</span></div>
-        <div class="hint mono" id="debug">—</div>
+    <div class="card">
+      <div class="manual">
+        <input id="manualInput" type="text" inputmode="latin" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Saisir ou coller un SN / code barre" />
+        <button id="btnSearch" class="btn-ghost">Rechercher</button>
       </div>
-
-      <label style="margin-top:12px">Saisie manuelle (option)</label>
-      <input id="manual" type="text" placeholder="ex: 2021000128930 ou V2021000128930" />
-      <div class="row" style="margin-top:10px">
-        <button id="searchBtn" class="secondary">Rechercher</button>
-      </div>
+      <p class="hint">La recherche essaie d’abord la valeur exacte, puis la variante avec / sans préfixe <code>V</code>.</p>
+      <div id="result" class="result" style="display:none;"></div>
+      <div class="meta" id="meta"></div>
     </div>
   </div>
 
-  <!-- ✅ SCRIPTS CORRECTS -->
-  <!-- ZXingBrowser global via script tag (UMD) -->
-  <script src="https://unpkg.com/@zxing/browser@latest"></script>
-  <!-- XLSX -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
   <script>
-    let db = new Map();
+    const LOOKUP = {"2021000128930":{"sn":"2021000128930","date":"19/12/2025 14:13:02","dateIso":"2025-12-19T14:13:02","matchedIn":"A"},"V2021000128930":{"sn":"2021000128930","date":"19/12/2025 14:13:02","dateIso":"2025-12-19T14:13:02","matchedIn":"B"},"20220014082":{"sn":"20220014082","date":"19/12/2025 14:14:52","dateIso":"2025-12-19T14:14:52","matchedIn":"A"},"V20220014082":{"sn":"20220014082","date":"19/12/2025 14:14:52","dateIso":"2025-12-19T14:14:52","matchedIn":"B"},"202100137962":{"sn":"202100137962","date":"19/12/2025 15:54:48","dateIso":"2025-12-19T15:54:48","matchedIn":"A"},"V202100137962":{"sn":"202100137962","date":"19/12/2025 15:54:48","dateIso":"2025-12-19T15:54:48","matchedIn":"B"},"202100133330":{"sn":"202100133330","date":"22/12/2025 15:48:44","dateIso":"2025-12-22T15:48:44","matchedIn":"A"},"V202100133330":{"sn":"202100133330","date":"22/12/2025 15:48:44","dateIso":"2025-12-22T15:48:44","matchedIn":"B"},"202100137560":{"sn":"202100137560","date":"22/12/2025 16:08:52","dateIso":"2025-12-22T16:08:52","matchedIn":"A"},"V202100137560":{"sn":"202100137560","date":"22/12/2025 16:08:52","dateIso":"2025-12-22T16:08:52","matchedIn":"B"},"202200001422":{"sn":"202200001422","date":"22/12/2025 16:10:21","dateIso":"2025-12-22T16:10:21","matchedIn":"A"},"V202200001422":{"sn":"202200001422","date":"22/12/2025 16:10:21","dateIso":"2025-12-22T16:10:21","matchedIn":"B"},"202100135645":{"sn":"202100135645","date":"22/12/2025 16:11:15","dateIso":"2025-12-22T16:11:15","matchedIn":"A"},"V202100135645":{"sn":"202100135645","date":"22/12/2025 16:11:15","dateIso":"2025-12-22T16:11:15","matchedIn":"B"},"202300003172":{"sn":"202300003172","date":"22/12/2025 16:12:08","dateIso":"2025-12-22T16:12:08","matchedIn":"A"},"V202300003172":{"sn":"202300003172","date":"22/12/2025 16:12:08","dateIso":"2025-12-22T16:12:08","matchedIn":"B"},"202100137512":{"sn":"202100137512","date":"22/12/2025 16:15:08","dateIso":"2025-12-22T16:15:08","matchedIn":"A"},"V202100137512":{"sn":"202100137512","date":"22/12/2025 16:15:08","dateIso":"2025-12-22T16:15:08","matchedIn":"B"},"202100132134":{"sn":"202100132134","date":"22/12/2025 16:18:09","dateIso":"2025-12-22T16:18:09","matchedIn":"A"},"V202100132134":{"sn":"202100132134","date":"22/12/2025 16:18:09","dateIso":"2025-12-22T16:18:09","matchedIn":"B"},"202300004506":{"sn":"202300004506","date":"22/12/2025 16:18:56","dateIso":"2025-12-22T16:18:56","matchedIn":"A"},"V202300004506":{"sn":"202300004506","date":"22/12/2025 16:18:56","dateIso":"2025-12-22T16:18:56","matchedIn":"B"},"202300004508":{"sn":"202300004508","date":"22/12/2025 16:24:23","dateIso":"2025-12-22T16:24:23","matchedIn":"A"},"V202300004508":{"sn":"202300004508","date":"22/12/2025 16:24:23","dateIso":"2025-12-22T16:24:23","matchedIn":"B"},"202200001417":{"sn":"202200001417","date":"22/12/2025 16:26:16","dateIso":"2025-12-22T16:26:16","matchedIn":"A"},"V202200001417":{"sn":"202200001417","date":"22/12/2025 16:26:16","dateIso":"2025-12-22T16:26:16","matchedIn":"B"},"202300004491":{"sn":"202300004491","date":"22/12/2025 16:27:04","dateIso":"2025-12-22T16:27:04","matchedIn":"A"},"V202300004491":{"sn":"202300004491","date":"22/12/2025 16:27:04","dateIso":"2025-12-22T16:27:04","matchedIn":"B"},"202200001664":{"sn":"202200001664","date":"22/12/2025 16:27:58","dateIso":"2025-12-22T16:27:58","matchedIn":"A"},"V202200001664":{"sn":"202200001664","date":"22/12/2025 16:27:58","dateIso":"2025-12-22T16:27:58","matchedIn":"B"},"202300004832":{"sn":"202300004832","date":"22/12/2025 16:28:39","dateIso":"2025-12-22T16:28:39","matchedIn":"A"},"V202300004832":{"sn":"202300004832","date":"22/12/2025 16:28:39","dateIso":"2025-12-22T16:28:39","matchedIn":"B"},"202200001652":{"sn":"202200001652","date":"22/12/2025 16:29:23","dateIso":"2025-12-22T16:29:23","matchedIn":"A"},"V202200001652":{"sn":"202200001652","date":"22/12/2025 16:29:23","dateIso":"2025-12-22T16:29:23","matchedIn":"B"},"202200001655":{"sn":"202200001655","date":"22/12/2025 16:30:17","dateIso":"2025-12-22T16:30:17","matchedIn":"A"},"V202200001655":{"sn":"202200001655","date":"22/12/2025 16:30:17","dateIso":"2025-12-22T16:30:17","matchedIn":"B"},"202200001984":{"sn":"202200001984","date":"22/12/2025 16:30:59","dateIso":"2025-12-22T16:30:59","matchedIn":"A"},"V202200001984":{"sn":"202200001984","date":"22/12/2025 16:30:59","dateIso":"2025-12-22T16:30:59","matchedIn":"B"},"202100132119":{"sn":"202100132119","date":"22/12/2025 16:31:50","dateIso":"2025-12-22T16:31:50","matchedIn":"A"},"V202100132119":{"sn":"202100132119","date":"22/12/2025 16:31:50","dateIso":"2025-12-22T16:31:50","matchedIn":"B"},"202500000905":{"sn":"202500000905","date":"22/12/2025 16:32:48","dateIso":"2025-12-22T16:32:48","matchedIn":"A"},"V202500000905":{"sn":"202500000905","date":"22/12/2025 16:32:48","dateIso":"2025-12-22T16:32:48","matchedIn":"B"},"202500000907":{"sn":"202500000907","date":"22/12/2025 16:33:42","dateIso":"2025-12-22T16:33:42","matchedIn":"A"},"V202500000907":{"sn":"202500000907","date":"22/12/2025 16:33:42","dateIso":"2025-12-22T16:33:42","matchedIn":"B"},"2022000142177":{"sn":"2022000142177","date":"22/12/2025 16:34:35","dateIso":"2025-12-22T16:34:35","matchedIn":"A"},"V2022000142177":{"sn":"2022000142177","date":"22/12/2025 16:34:35","dateIso":"2025-12-22T16:34:35","matchedIn":"B"},"202100137758":{"sn":"202100137758","date":"05/01/2026 14:37:09","dateIso":"2026-01-05T14:37:09","matchedIn":"A"},"V202100137758":{"sn":"202100137758","date":"05/01/2026 14:37:09","dateIso":"2026-01-05T14:37:09","matchedIn":"B"},"202200001839":{"sn":"202200001839","date":"05/01/2026 14:37:53","dateIso":"2026-01-05T14:37:53","matchedIn":"A"},"V202200001839":{"sn":"202200001839","date":"05/01/2026 14:37:53","dateIso":"2026-01-05T14:37:53","matchedIn":"B"},"202200001435":{"sn":"202200001435","date":"05/01/2026 14:38:36","dateIso":"2026-01-05T14:38:36","matchedIn":"A"},"V202200001435":{"sn":"202200001435","date":"05/01/2026 14:38:36","dateIso":"2026-01-05T14:38:36","matchedIn":"B"},"202500000906":{"sn":"202500000906","date":"05/01/2026 14:39:21","dateIso":"2026-01-05T14:39:21","matchedIn":"A"},"V202500000906":{"sn":"202500000906","date":"05/01/2026 14:39:21","dateIso":"2026-01-05T14:39:21","matchedIn":"B"},"202100136310":{"sn":"202100136310","date":"05/01/2026 14:39:58","dateIso":"2026-01-05T14:39:58","matchedIn":"A"},"V202100136310":{"sn":"202100136310","date":"05/01/2026 14:39:58","dateIso":"2026-01-05T14:39:58","matchedIn":"B"},"202200001415":{"sn":"202200001415","date":"05/01/2026 14:40:40","dateIso":"2026-01-05T14:40:40","matchedIn":"A"},"V202200001415":{"sn":"202200001415","date":"05/01/2026 14:40:40","dateIso":"2026-01-05T14:40:40","matchedIn":"B"},"202100135621":{"sn":"202100135621","date":"05/01/2026 14:41:22","dateIso":"2026-01-05T14:41:22","matchedIn":"A"},"V202100135621":{"sn":"202100135621","date":"05/01/2026 14:41:22","dateIso":"2026-01-05T14:41:22","matchedIn":"B"},"202200001985":{"sn":"202200001985","date":"05/01/2026 14:41:59","dateIso":"2026-01-05T14:41:59","matchedIn":"A"},"V202200001985":{"sn":"202200001985","date":"05/01/2026 14:41:59","dateIso":"2026-01-05T14:41:59","matchedIn":"B"},"202100132120":{"sn":"202100132120","date":"05/01/2026 14:42:45","dateIso":"2026-01-05T14:42:45","matchedIn":"A"},"V202100132120":{"sn":"202100132120","date":"05/01/2026 14:42:45","dateIso":"2026-01-05T14:42:45","matchedIn":"B"},"202300004494":{"sn":"202300004494","date":"05/01/2026 14:43:20","dateIso":"2026-01-05T14:43:20","matchedIn":"A"},"V202300004494":{"sn":"202300004494","date":"05/01/2026 14:43:20","dateIso":"2026-01-05T14:43:20","matchedIn":"B"},"202300003047":{"sn":"202300003047","date":"09/01/2026 14:56:16","dateIso":"2026-01-09T14:56:16","matchedIn":"A"},"V202300003047":{"sn":"202300003047","date":"09/01/2026 14:56:16","dateIso":"2026-01-09T14:56:16","matchedIn":"B"},"202200142082":{"sn":"202200142082","date":"09/01/2026 15:00:04","dateIso":"2026-01-09T15:00:04","matchedIn":"A"},"V202200142082":{"sn":"202200142082","date":"09/01/2026 15:00:04","dateIso":"2026-01-09T15:00:04","matchedIn":"B"},"202100138101":{"sn":"202100138101","date":"12/01/2026 08:49:47","dateIso":"2026-01-12T08:49:47","matchedIn":"A"},"V202100138101":{"sn":"202100138101","date":"12/01/2026 08:49:47","dateIso":"2026-01-12T08:49:47","matchedIn":"B"},"202300003042":{"sn":"202300003042","date":"12/01/2026 10:59:53","dateIso":"2026-01-12T10:59:53","matchedIn":"A"},"V202300003042":{"sn":"202300003042","date":"12/01/2026 10:59:53","dateIso":"2026-01-12T10:59:53","matchedIn":"B"},"202100133342":{"sn":"202100133342","date":"12/01/2026 11:27:11","dateIso":"2026-01-12T11:27:11","matchedIn":"A"},"V202100133342":{"sn":"202100133342","date":"12/01/2026 11:27:11","dateIso":"2026-01-12T11:27:11","matchedIn":"B"},"202200001810":{"sn":"202200001810","date":"12/01/2026 12:23:54","dateIso":"2026-01-12T12:23:54","matchedIn":"A"},"V202200001810":{"sn":"202200001810","date":"12/01/2026 12:23:54","dateIso":"2026-01-12T12:23:54","matchedIn":"B"},"20210013345":{"sn":"20210013345","date":"12/01/2026 12:33:44","dateIso":"2026-01-12T12:33:44","matchedIn":"A"},"V20210013345":{"sn":"20210013345","date":"12/01/2026 12:33:44","dateIso":"2026-01-12T12:33:44","matchedIn":"B"},"2021000127751":{"sn":"2021000127751","date":"12/01/2026 13:43:26","dateIso":"2026-01-12T13:43:26","matchedIn":"A"},"V2021000127751":{"sn":"2021000127751","date":"12/01/2026 13:43:26","dateIso":"2026-01-12T13:43:26","matchedIn":"B"},"202300004495":{"sn":"202300004495","date":"12/01/2026 13:44:15","dateIso":"2026-01-12T13:44:15","matchedIn":"A"},"V202300004495":{"sn":"202300004495","date":"12/01/2026 13:44:15","dateIso":"2026-01-12T13:44:15","matchedIn":"B"},"2023000004587":{"sn":"2023000004587","date":"12/01/2026 13:44:55","dateIso":"2026-01-12T13:44:55","matchedIn":"A"},"V2023000004587":{"sn":"2023000004587","date":"12/01/2026 13:44:55","dateIso":"2026-01-12T13:44:55","matchedIn":"B"},"202300004141":{"sn":"202300004141","date":"12/01/2026 13:46:47","dateIso":"2026-01-12T13:46:47","matchedIn":"A"},"V202300004141":{"sn":"202300004141","date":"12/01/2026 13:46:47","dateIso":"2026-01-12T13:46:47","matchedIn":"B"},"202100137527":{"sn":"202100137527","date":"12/01/2026 14:08:30","dateIso":"2026-01-12T14:08:30","matchedIn":"A"},"V202100137527":{"sn":"202100137527","date":"12/01/2026 14:08:30","dateIso":"2026-01-12T14:08:30","matchedIn":"B"},"202100129753":{"sn":"202100129753","date":"12/01/2026 14:42:01","dateIso":"2026-01-12T14:42:01","matchedIn":"A"},"V202100129753":{"sn":"202100129753","date":"12/01/2026 14:42:01","dateIso":"2026-01-12T14:42:01","matchedIn":"B"},"2019000061948":{"sn":"2019000061948","date":"12/01/2026 14:43:03","dateIso":"2026-01-12T14:43:03","matchedIn":"A"},"V2019000061948":{"sn":"2019000061948","date":"12/01/2026 14:43:03","dateIso":"2026-01-12T14:43:03","matchedIn":"B"},"202300004499":{"sn":"202300004499","date":"12/01/2026 14:59:04","dateIso":"2026-01-12T14:59:04","matchedIn":"A"},"V202300004499":{"sn":"202300004499","date":"12/01/2026 14:59:04","dateIso":"2026-01-12T14:59:04","matchedIn":"B"},"202300004509":{"sn":"202300004509","date":"12/01/2026 14:59:55","dateIso":"2026-01-12T14:59:55","matchedIn":"A"},"V202300004509":{"sn":"202300004509","date":"12/01/2026 14:59:55","dateIso":"2026-01-12T14:59:55","matchedIn":"B"},"202200001412":{"sn":"202200001412","date":"12/01/2026 15:43:16","dateIso":"2026-01-12T15:43:16","matchedIn":"A"},"V202200001412":{"sn":"202200001412","date":"12/01/2026 15:43:16","dateIso":"2026-01-12T15:43:16","matchedIn":"B"},"202100137586":{"sn":"202100137586","date":"13/01/2026 12:12:39","dateIso":"2026-01-13T12:12:39","matchedIn":"A"},"V202100137586":{"sn":"202100137586","date":"13/01/2026 12:12:39","dateIso":"2026-01-13T12:12:39","matchedIn":"B"},"202200001995":{"sn":"202200001995","date":"14/01/2026 10:24:04","dateIso":"2026-01-14T10:24:04","matchedIn":"A"},"V202200001995":{"sn":"202200001995","date":"14/01/2026 10:24:04","dateIso":"2026-01-14T10:24:04","matchedIn":"B"},"202100137516":{"sn":"202100137516","date":"14/01/2026 11:46:31","dateIso":"2026-01-14T11:46:31","matchedIn":"A"},"V202100137516":{"sn":"202100137516","date":"14/01/2026 11:46:31","dateIso":"2026-01-14T11:46:31","matchedIn":"B"},"202300004608":{"sn":"202300004608","date":"14/01/2026 11:48:16","dateIso":"2026-01-14T11:48:16","matchedIn":"A"},"V202300004608":{"sn":"202300004608","date":"14/01/2026 11:48:16","dateIso":"2026-01-14T11:48:16","matchedIn":"B"},"202100137756":{"sn":"202100137756","date":"14/01/2026 11:49:48","dateIso":"2026-01-14T11:49:48","matchedIn":"A"},"V202100137756":{"sn":"202100137756","date":"14/01/2026 11:49:48","dateIso":"2026-01-14T11:49:48","matchedIn":"B"},"202100138080":{"sn":"202100138080","date":"14/01/2026 13:48:43","dateIso":"2026-01-14T13:48:43","matchedIn":"A"},"V202100138080":{"sn":"202100138080","date":"14/01/2026 13:48:43","dateIso":"2026-01-14T13:48:43","matchedIn":"B"},"202200001837":{"sn":"202200001837","date":"21/01/2026 11:03:17","dateIso":"2026-01-21T11:03:17","matchedIn":"A"},"V202200001837":{"sn":"202200001837","date":"21/01/2026 11:03:17","dateIso":"2026-01-21T11:03:17","matchedIn":"B"},"202200001573":{"sn":"202200001573","date":"21/01/2026 11:05:56","dateIso":"2026-01-21T11:05:56","matchedIn":"A"},"V202200001573":{"sn":"202200001573","date":"21/01/2026 11:05:56","dateIso":"2026-01-21T11:05:56","matchedIn":"B"},"202200001444":{"sn":"202200001444","date":"22/01/2026 08:36:37","dateIso":"2026-01-22T08:36:37","matchedIn":"A"},"V202200001444":{"sn":"202200001444","date":"22/01/2026 08:36:37","dateIso":"2026-01-22T08:36:37","matchedIn":"B"},"202200001851":{"sn":"202200001851","date":"22/01/2026 08:38:43","dateIso":"2026-01-22T08:38:43","matchedIn":"A"},"V202200001851":{"sn":"202200001851","date":"22/01/2026 08:38:43","dateIso":"2026-01-22T08:38:43","matchedIn":"B"},"202200001447":{"sn":"202200001447","date":"22/01/2026 08:39:46","dateIso":"2026-01-22T08:39:46","matchedIn":"A"},"V202200001447":{"sn":"202200001447","date":"22/01/2026 08:39:46","dateIso":"2026-01-22T08:39:46","matchedIn":"B"},"202300004496":{"sn":"202300004496","date":"22/01/2026 08:54:09","dateIso":"2026-01-22T08:54:09","matchedIn":"A"},"V202300004496":{"sn":"202300004496","date":"22/01/2026 08:54:09","dateIso":"2026-01-22T08:54:09","matchedIn":"B"},"202100131986":{"sn":"202100131986","date":"22/01/2026 09:15:42","dateIso":"2026-01-22T09:15:42","matchedIn":"A"},"V202100131986":{"sn":"202100131986","date":"22/01/2026 09:15:42","dateIso":"2026-01-22T09:15:42","matchedIn":"B"},"2019000077837":{"sn":"2019000077837","date":"26/01/2026 12:08:43","dateIso":"2026-01-26T12:08:43","matchedIn":"A"},"V2019000077837":{"sn":"2019000077837","date":"26/01/2026 12:08:43","dateIso":"2026-01-26T12:08:43","matchedIn":"B"},"202200001999":{"sn":"202200001999","date":"28/01/2026 09:20:45","dateIso":"2026-01-28T09:20:45","matchedIn":"A"},"V202200001999":{"sn":"202200001999","date":"28/01/2026 09:20:45","dateIso":"2026-01-28T09:20:45","matchedIn":"B"},"202100137387":{"sn":"202100137387","date":"28/01/2026 09:21:36","dateIso":"2026-01-28T09:21:36","matchedIn":"A"},"V202100137387":{"sn":"202100137387","date":"28/01/2026 09:21:36","dateIso":"2026-01-28T09:21:36","matchedIn":"B"},"202200001824":{"sn":"202200001824","date":"28/01/2026 09:22:27","dateIso":"2026-01-28T09:22:27","matchedIn":"A"},"V202200001824":{"sn":"202200001824","date":"28/01/2026 09:22:27","dateIso":"2026-01-28T09:22:27","matchedIn":"B"},"202200001821":{"sn":"202200001821","date":"28/01/2026 09:23:41","dateIso":"2026-01-28T09:23:41","matchedIn":"A"},"V202200001821":{"sn":"202200001821","date":"28/01/2026 09:23:41","dateIso":"2026-01-28T09:23:41","matchedIn":"B"},"202300004612":{"sn":"202300004612","date":"28/01/2026 09:24:50","dateIso":"2026-01-28T09:24:50","matchedIn":"A"},"V202300004612":{"sn":"202300004612","date":"28/01/2026 09:24:50","dateIso":"2026-01-28T09:24:50","matchedIn":"B"},"202300004589":{"sn":"202300004589","date":"28/01/2026 09:25:50","dateIso":"2026-01-28T09:25:50","matchedIn":"A"},"V202300004589":{"sn":"202300004589","date":"28/01/2026 09:25:50","dateIso":"2026-01-28T09:25:50","matchedIn":"B"},"202100131300":{"sn":"202100131300","date":"28/01/2026 09:26:51","dateIso":"2026-01-28T09:26:51","matchedIn":"A"},"V202100131300":{"sn":"202100131300","date":"28/01/2026 09:26:51","dateIso":"2026-01-28T09:26:51","matchedIn":"B"},"202200001433":{"sn":"202200001433","date":"28/01/2026 09:27:50","dateIso":"2026-01-28T09:27:50","matchedIn":"A"},"V202200001433":{"sn":"202200001433","date":"28/01/2026 09:27:50","dateIso":"2026-01-28T09:27:50","matchedIn":"B"},"2022000142172":{"sn":"2022000142172","date":"28/01/2026 09:28:43","dateIso":"2026-01-28T09:28:43","matchedIn":"A"},"V2022000142172":{"sn":"2022000142172","date":"28/01/2026 09:28:43","dateIso":"2026-01-28T09:28:43","matchedIn":"B"},"202100137777":{"sn":"202100137777","date":"28/01/2026 09:29:40","dateIso":"2026-01-28T09:29:40","matchedIn":"A"},"V202100137777":{"sn":"202100137777","date":"28/01/2026 09:29:40","dateIso":"2026-01-28T09:29:40","matchedIn":"B"},"202200001423":{"sn":"202200001423","date":"28/01/2026 09:30:47","dateIso":"2026-01-28T09:30:47","matchedIn":"A"},"V202200001423":{"sn":"202200001423","date":"28/01/2026 09:30:47","dateIso":"2026-01-28T09:30:47","matchedIn":"B"},"202100137392":{"sn":"202100137392","date":"28/01/2026 09:31:24","dateIso":"2026-01-28T09:31:24","matchedIn":"A"},"V202100137392":{"sn":"202100137392","date":"28/01/2026 09:31:24","dateIso":"2026-01-28T09:31:24","matchedIn":"B"},"202100129758":{"sn":"202100129758","date":"28/01/2026 09:31:59","dateIso":"2026-01-28T09:31:59","matchedIn":"A"},"V202100129758":{"sn":"202100129758","date":"28/01/2026 09:31:59","dateIso":"2026-01-28T09:31:59","matchedIn":"B"},"202100129830":{"sn":"202100129830","date":"28/01/2026 09:32:39","dateIso":"2026-01-28T09:32:39","matchedIn":"A"},"V202100129830":{"sn":"202100129830","date":"28/01/2026 09:32:39","dateIso":"2026-01-28T09:32:39","matchedIn":"B"},"2021001129741":{"sn":"2021001129741","date":"28/01/2026 09:33:15","dateIso":"2026-01-28T09:33:15","matchedIn":"A"},"V2021001129741":{"sn":"2021001129741","date":"28/01/2026 09:33:15","dateIso":"2026-01-28T09:33:15","matchedIn":"B"},"202100134328":{"sn":"202100134328","date":"29/01/2026 14:12:33","dateIso":"2026-01-29T14:12:33","matchedIn":"A"},"V202100134328":{"sn":"202100134328","date":"29/01/2026 14:12:33","dateIso":"2026-01-29T14:12:33","matchedIn":"B"},"202100135948":{"sn":"202100135948","date":"29/01/2026 14:14:16","dateIso":"2026-01-29T14:14:16","matchedIn":"A"},"V202100135948":{"sn":"202100135948","date":"29/01/2026 14:14:16","dateIso":"2026-01-29T14:14:16","matchedIn":"B"},"202100131575":{"sn":"202100131575","date":"30/01/2026 11:12:41","dateIso":"2026-01-30T11:12:41","matchedIn":"A"},"V202100131575":{"sn":"202100131575","date":"30/01/2026 11:12:41","dateIso":"2026-01-30T11:12:41","matchedIn":"B"},"202300004603":{"sn":"202300004603","date":"30/01/2026 12:23:42","dateIso":"2026-01-30T12:23:42","matchedIn":"A"},"V202300004603":{"sn":"202300004603","date":"30/01/2026 12:23:42","dateIso":"2026-01-30T12:23:42","matchedIn":"B"},"202100137497":{"sn":"202100137497","date":"30/01/2026 14:52:16","dateIso":"2026-01-30T14:52:16","matchedIn":"A"},"V202100137497":{"sn":"202100137497","date":"30/01/2026 14:52:16","dateIso":"2026-01-30T14:52:16","matchedIn":"B"},"202200001689":{"sn":"202200001689","date":"30/01/2026 14:53:51","dateIso":"2026-01-30T14:53:51","matchedIn":"A"},"V202200001689":{"sn":"202200001689","date":"30/01/2026 14:53:51","dateIso":"2026-01-30T14:53:51","matchedIn":"B"},"2021000128913":{"sn":"2021000128913","date":"30/01/2026 14:54:43","dateIso":"2026-01-30T14:54:43","matchedIn":"A"},"V2021000128913":{"sn":"2021000128913","date":"30/01/2026 14:54:43","dateIso":"2026-01-30T14:54:43","matchedIn":"B"},"202300004492":{"sn":"202300004492","date":"30/01/2026 14:55:36","dateIso":"2026-01-30T14:55:36","matchedIn":"A"},"V202300004492":{"sn":"202300004492","date":"30/01/2026 14:55:36","dateIso":"2026-01-30T14:55:36","matchedIn":"B"},"202200001671":{"sn":"202200001671","date":"30/01/2026 14:56:24","dateIso":"2026-01-30T14:56:24","matchedIn":"A"},"V202200001671":{"sn":"202200001671","date":"30/01/2026 14:56:24","dateIso":"2026-01-30T14:56:24","matchedIn":"B"},"202100131574":{"sn":"202100131574","date":"30/01/2026 14:57:18","dateIso":"2026-01-30T14:57:18","matchedIn":"A"},"V202100131574":{"sn":"202100131574","date":"30/01/2026 14:57:18","dateIso":"2026-01-30T14:57:18","matchedIn":"B"},"202200001695":{"sn":"202200001695","date":"30/01/2026 14:58:11","dateIso":"2026-01-30T14:58:11","matchedIn":"A"},"V202200001695":{"sn":"202200001695","date":"30/01/2026 14:58:11","dateIso":"2026-01-30T14:58:11","matchedIn":"B"},"202300004590":{"sn":"202300004590","date":"30/01/2026 14:59:12","dateIso":"2026-01-30T14:59:12","matchedIn":"A"},"V202300004590":{"sn":"202300004590","date":"30/01/2026 14:59:12","dateIso":"2026-01-30T14:59:12","matchedIn":"B"},"202200001659":{"sn":"202200001659","date":"30/01/2026 14:59:58","dateIso":"2026-01-30T14:59:58","matchedIn":"A"},"V202200001659":{"sn":"202200001659","date":"30/01/2026 14:59:58","dateIso":"2026-01-30T14:59:58","matchedIn":"B"},"202300003168":{"sn":"202300003168","date":"30/01/2026 15:00:39","dateIso":"2026-01-30T15:00:39","matchedIn":"A"},"V202300003168":{"sn":"202300003168","date":"30/01/2026 15:00:39","dateIso":"2026-01-30T15:00:39","matchedIn":"B"},"202200001843":{"sn":"202200001843","date":"02/02/2026 12:41:20","dateIso":"2026-02-02T12:41:20","matchedIn":"A"},"V202200001843":{"sn":"202200001843","date":"02/02/2026 12:41:20","dateIso":"2026-02-02T12:41:20","matchedIn":"B"},"202100135927":{"sn":"202100135927","date":"02/02/2026 14:03:53","dateIso":"2026-02-02T14:03:53","matchedIn":"A"},"V202100135927":{"sn":"202100135927","date":"02/02/2026 14:03:53","dateIso":"2026-02-02T14:03:53","matchedIn":"B"},"2019000077845":{"sn":"2019000077845","date":"02/02/2026 14:04:36","dateIso":"2026-02-02T14:04:36","matchedIn":"A"},"V2019000077845":{"sn":"2019000077845","date":"02/02/2026 14:04:36","dateIso":"2026-02-02T14:04:36","matchedIn":"B"},"202100131979":{"sn":"202100131979","date":"06/02/2026 15:50:32","dateIso":"2026-02-06T15:50:32","matchedIn":"A"},"V202100131979":{"sn":"202100131979","date":"06/02/2026 15:50:32","dateIso":"2026-02-06T15:50:32","matchedIn":"B"},"20211318":{"sn":"20211318","date":"06/02/2026 16:03:34","dateIso":"2026-02-06T16:03:34","matchedIn":"A"},"V20211318":{"sn":"20211318","date":"06/02/2026 16:03:34","dateIso":"2026-02-06T16:03:34","matchedIn":"B"},"202100131566":{"sn":"202100131566","date":"06/02/2026 16:04:12","dateIso":"2026-02-06T16:04:12","matchedIn":"A"},"V202100131566":{"sn":"202100131566","date":"06/02/2026 16:04:12","dateIso":"2026-02-06T16:04:12","matchedIn":"B"},"202300004505":{"sn":"202300004505","date":"06/02/2026 16:05:18","dateIso":"2026-02-06T16:05:18","matchedIn":"A"},"V202300004505":{"sn":"202300004505","date":"06/02/2026 16:05:18","dateIso":"2026-02-06T16:05:18","matchedIn":"B"},"202100135518":{"sn":"202100135518","date":"06/02/2026 16:05:50","dateIso":"2026-02-06T16:05:50","matchedIn":"A"},"V202100135518":{"sn":"202100135518","date":"06/02/2026 16:05:50","dateIso":"2026-02-06T16:05:50","matchedIn":"B"},"202100137518":{"sn":"202100137518","date":"06/02/2026 16:06:23","dateIso":"2026-02-06T16:06:23","matchedIn":"A"},"V202100137518":{"sn":"202100137518","date":"06/02/2026 16:06:23","dateIso":"2026-02-06T16:06:23","matchedIn":"B"},"202100137776":{"sn":"202100137776","date":"06/02/2026 16:07:07","dateIso":"2026-02-06T16:07:07","matchedIn":"A"},"V202100137776":{"sn":"202100137776","date":"06/02/2026 16:07:07","dateIso":"2026-02-06T16:07:07","matchedIn":"B"},"202200001419":{"sn":"202200001419","date":"06/02/2026 16:07:44","dateIso":"2026-02-06T16:07:44","matchedIn":"A"},"V202200001419":{"sn":"202200001419","date":"06/02/2026 16:07:44","dateIso":"2026-02-06T16:07:44","matchedIn":"B"},"202100137788":{"sn":"202100137788","date":"06/02/2026 16:08:20","dateIso":"2026-02-06T16:08:20","matchedIn":"A"},"V202100137788":{"sn":"202100137788","date":"06/02/2026 16:08:20","dateIso":"2026-02-06T16:08:20","matchedIn":"B"},"202300004504":{"sn":"202300004504","date":"09/02/2026 10:59:10","dateIso":"2026-02-09T10:59:10","matchedIn":"A"},"V202300004504":{"sn":"202300004504","date":"09/02/2026 10:59:10","dateIso":"2026-02-09T10:59:10","matchedIn":"B"},"202100137571":{"sn":"202100137571","date":"09/02/2026 11:00:40","dateIso":"2026-02-09T11:00:40","matchedIn":"A"},"V202100137571":{"sn":"202100137571","date":"09/02/2026 11:00:40","dateIso":"2026-02-09T11:00:40","matchedIn":"B"},"202200001683":{"sn":"202200001683","date":"09/02/2026 11:01:23","dateIso":"2026-02-09T11:01:23","matchedIn":"A"},"V202200001683":{"sn":"202200001683","date":"09/02/2026 11:01:23","dateIso":"2026-02-09T11:01:23","matchedIn":"B"},"202200001430":{"sn":"202200001430","date":"09/02/2026 11:01:54","dateIso":"2026-02-09T11:01:54","matchedIn":"A"},"V202200001430":{"sn":"202200001430","date":"09/02/2026 11:01:54","dateIso":"2026-02-09T11:01:54","matchedIn":"B"},"202300004500":{"sn":"202300004500","date":"09/02/2026 11:02:30","dateIso":"2026-02-09T11:02:30","matchedIn":"A"},"V202300004500":{"sn":"202300004500","date":"09/02/2026 11:02:30","dateIso":"2026-02-09T11:02:30","matchedIn":"B"},"202100138078":{"sn":"202100138078","date":"09/02/2026 11:03:00","dateIso":"2026-02-09T11:03:00","matchedIn":"A"},"V202100138078":{"sn":"202100138078","date":"09/02/2026 11:03:00","dateIso":"2026-02-09T11:03:00","matchedIn":"B"},"202100137584":{"sn":"202100137584","date":"09/02/2026 11:06:00","dateIso":"2026-02-09T11:06:00","matchedIn":"A"},"V202100137584":{"sn":"202100137584","date":"09/02/2026 11:06:00","dateIso":"2026-02-09T11:06:00","matchedIn":"B"},"202100132270":{"sn":"202100132270","date":"09/02/2026 11:06:34","dateIso":"2026-02-09T11:06:34","matchedIn":"A"},"V202100132270":{"sn":"202100132270","date":"09/02/2026 11:06:34","dateIso":"2026-02-09T11:06:34","matchedIn":"B"},"202200001693":{"sn":"202200001693","date":"09/02/2026 11:07:17","dateIso":"2026-02-09T11:07:17","matchedIn":"A"},"V202200001693":{"sn":"202200001693","date":"09/02/2026 11:07:17","dateIso":"2026-02-09T11:07:17","matchedIn":"B"},"2019000078547":{"sn":"2019000078547","date":"09/02/2026 11:07:52","dateIso":"2026-02-09T11:07:52","matchedIn":"A"},"V2019000078547":{"sn":"2019000078547","date":"09/02/2026 11:07:52","dateIso":"2026-02-09T11:07:52","matchedIn":"B"},"202300003985":{"sn":"202300003985","date":"09/02/2026 11:15:28","dateIso":"2026-02-09T11:15:28","matchedIn":"A"},"V202300003985":{"sn":"202300003985","date":"09/02/2026 11:15:28","dateIso":"2026-02-09T11:15:28","matchedIn":"B"},"202200142177":{"sn":"202200142177","date":"17/02/2026 10:29:39","dateIso":"2026-02-17T10:29:39","matchedIn":"A"},"V202200142177":{"sn":"202200142177","date":"17/02/2026 10:29:39","dateIso":"2026-02-17T10:29:39","matchedIn":"B"},"202100129754":{"sn":"202100129754","date":"09/03/2026 15:37:25","dateIso":"2026-03-09T15:37:25","matchedIn":"A"},"V202100129754":{"sn":"202100129754","date":"09/03/2026 15:37:25","dateIso":"2026-03-09T15:37:25","matchedIn":"B"},"202300003043":{"sn":"202300003043","date":"09/03/2026 15:38:11","dateIso":"2026-03-09T15:38:11","matchedIn":"A"},"V202300003043":{"sn":"202300003043","date":"09/03/2026 15:38:11","dateIso":"2026-03-09T15:38:11","matchedIn":"B"},"202400015697":{"sn":"202400015697","date":"09/03/2026 15:38:55","dateIso":"2026-03-09T15:38:55","matchedIn":"A"},"V202400015697":{"sn":"202400015697","date":"09/03/2026 15:38:55","dateIso":"2026-03-09T15:38:55","matchedIn":"B"},"202200001832":{"sn":"202200001832","date":"09/03/2026 15:39:32","dateIso":"2026-03-09T15:39:32","matchedIn":"A"},"V202200001832":{"sn":"202200001832","date":"09/03/2026 15:39:32","dateIso":"2026-03-09T15:39:32","matchedIn":"B"},"202100132125":{"sn":"202100132125","date":"09/03/2026 15:40:03","dateIso":"2026-03-09T15:40:03","matchedIn":"A"},"V202100132125":{"sn":"202100132125","date":"09/03/2026 15:40:03","dateIso":"2026-03-09T15:40:03","matchedIn":"B"},"202300005305":{"sn":"202300005305","date":"09/03/2026 15:40:40","dateIso":"2026-03-09T15:40:40","matchedIn":"A"},"V202300005305":{"sn":"202300005305","date":"09/03/2026 15:40:40","dateIso":"2026-03-09T15:40:40","matchedIn":"B"},"202200001816":{"sn":"202200001816","date":"09/03/2026 15:41:21","dateIso":"2026-03-09T15:41:21","matchedIn":"A"},"V202200001816":{"sn":"202200001816","date":"09/03/2026 15:41:21","dateIso":"2026-03-09T15:41:21","matchedIn":"B"},"202200142171":{"sn":"202200142171","date":"23/03/2026 14:47:00","dateIso":"2026-03-23T14:47:00","matchedIn":"A"},"V202200142171":{"sn":"202200142171","date":"23/03/2026 14:47:00","dateIso":"2026-03-23T14:47:00","matchedIn":"B"},"202200001685":{"sn":"202200001685","date":"23/03/2026 14:47:32","dateIso":"2026-03-23T14:47:32","matchedIn":"A"},"V202200001685":{"sn":"202200001685","date":"23/03/2026 14:47:32","dateIso":"2026-03-23T14:47:32","matchedIn":"B"},"202300004588":{"sn":"202300004588","date":"15/04/2026 11:24:19","dateIso":"2026-04-15T11:24:19","matchedIn":"A"},"V202300004588":{"sn":"202300004588","date":"15/04/2026 11:24:19","dateIso":"2026-04-15T11:24:19","matchedIn":"B"},"202200001431":{"sn":"202200001431","date":"15/04/2026 11:24:52","dateIso":"2026-04-15T11:24:52","matchedIn":"A"},"V202200001431":{"sn":"202200001431","date":"15/04/2026 11:24:52","dateIso":"2026-04-15T11:24:52","matchedIn":"B"},"#VALUE!":{"sn":"#VALUE!","date":"#VALUE!","dateIso":"","matchedIn":"B"}};
+    const APP_STATS = {"rows":188,"keys":257,"duplicates":1,"sourceSheet":"Feuil1","sourceFile":"TEST Batteries BJONG.xlsx"};
+
+    const videoEl = document.getElementById('video');
+    const statusEl = document.getElementById('status');
+    const statusTextEl = document.getElementById('statusText');
+    const resultEl = document.getElementById('result');
+    const btnStart = document.getElementById('btnStart');
+    const btnStop = document.getElementById('btnStop');
+    const btnSearch = document.getElementById('btnSearch');
+    const manualInput = document.getElementById('manualInput');
+    const metaEl = document.getElementById('meta');
+
+    let permissionPrimed = false;
+    let zxingLoaded = false;
+    let codeReader = null;
     let controls = null;
+    let activeStream = null;
+    let lastDecodedText = '';
+    let lastDecodedAt = 0;
 
-    const $ = (id)=>document.getElementById(id);
-    const norm = (v)=>String(v||'').trim().replace(/\s+/g,'').toUpperCase();
+    metaEl.textContent = `Base embarquée : ${APP_STATS.rows} lignes (${APP_STATS.sourceSheet}) · ${APP_STATS.keys} clés de recherche`;
 
-    function setDbOk(msg){
-      $('dbStatus').classList.add('ok');
-      $('dbStatus').classList.remove('ko');
-      $('dbHint').textContent = msg;
-    }
-    function setDbKo(msg){
-      $('dbStatus').classList.add('ko');
-      $('dbStatus').classList.remove('ok');
-      $('dbHint').textContent = msg;
-    }
-    function log(msg){ $('debug').textContent = msg; }
-    function setResult(txt){ $('result').textContent = txt; }
-
-    function updateLibHint(){
-      const okZX = (typeof ZXingBrowser !== 'undefined');
-      const okX  = (typeof XLSX !== 'undefined');
-      $('libHint').textContent = `ZXingBrowser: ${okZX?'OK':'KO'} • XLSX: ${okX?'OK':'KO'}`;
+    function setStatus(text, mode = 'idle') {
+      statusTextEl.textContent = text;
+      statusEl.className = 'status';
+      if (mode === 'ok') statusEl.classList.add('ok');
+      if (mode === 'bad') statusEl.classList.add('bad');
+      if (mode === 'scan') statusEl.classList.add('scan');
     }
 
-    function toDisplayDate(v){
-      if(v==null || v==='') return '';
-      if(v instanceof Date && !isNaN(v)) return v.toLocaleString('fr-FR');
-      if(typeof v === 'number' && typeof XLSX !== 'undefined'){
-        const d = XLSX.SSF.parse_date_code(v);
-        if(d){
-          const dt = new Date(d.y, d.m-1, d.d, d.H||0, d.M||0, Math.floor(d.S||0));
-          return dt.toLocaleString('fr-FR');
+    function escapeHtml(text) {
+      return String(text ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function normalizeKey(value) {
+      return String(value ?? '').trim().replace(/\s+/g, '').toUpperCase();
+    }
+
+    function buildCandidateKeys(raw) {
+      const exact = normalizeKey(raw);
+      const candidates = [];
+      if (exact) candidates.push(exact);
+      if (exact && exact.startsWith('V')) candidates.push(exact.slice(1));
+      if (exact && !exact.startsWith('V')) candidates.push('V' + exact);
+      return [...new Set(candidates.filter(Boolean))];
+    }
+
+    function lookupBarcode(raw) {
+      for (const key of buildCandidateKeys(raw)) {
+        if (LOOKUP[key]) {
+          return { scanned: String(raw ?? '').trim(), lookupKey: key, ...LOOKUP[key] };
         }
       }
-      return String(v);
+      return null;
     }
 
-    function lookup(raw){
-      const code = norm(raw);
-      if(!code){ setResult('SN vide'); return; }
-      let hit = db.get(code);
-      if(!hit){
-        if(code.startsWith('V')) hit = db.get(code.substring(1));
-        else hit = db.get('V'+code);
+    function renderResult(raw) {
+      const found = lookupBarcode(raw);
+      resultEl.style.display = 'block';
+      if (found) {
+        resultEl.className = 'result ok';
+        resultEl.innerHTML = `
+          <h2>Correspondance trouvée ✅</h2>
+          <div class="kv">
+            <div class="k">Code lu</div><div class="v">${escapeHtml(found.scanned)}</div>
+            <div class="k">SN</div><div class="v">${escapeHtml(found.sn)}</div>
+            <div class="k">Date</div><div class="v">${escapeHtml(found.date)}</div>
+            <div class="k">Trouvé via</div><div class="v">colonne ${escapeHtml(found.matchedIn)}${found.matchedIn === 'A' ? ' (NS)' : ' (NS (V))'}</div>
+          </div>`;
+        setStatus(`Trouvé : ${found.sn} · ${found.date}`, 'ok');
+      } else {
+        resultEl.className = 'result bad';
+        resultEl.innerHTML = `
+          <h2>Aucune correspondance ❌</h2>
+          <div class="kv">
+            <div class="k">Code lu</div><div class="v">${escapeHtml(raw)}</div>
+            <div class="k">Recherche</div><div class="v">Aucune valeur trouvée dans les colonnes A ou B</div>
+          </div>`;
+        setStatus('Aucune correspondance trouvée.', 'bad');
       }
-      if(hit) setResult(`${code} → ${hit}`);
-      else setResult(`${code} → NON TROUVÉ`);
     }
 
-    // ✅ Amorçage permission caméra iOS (déclenche la popup ici)
-    async function primeCameraPermission(){
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-      s.getTracks().forEach(t=>t.stop());
+    async function primeCameraPermissionIOS() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('API caméra non disponible sur ce navigateur.');
+      }
+      setStatus('Demande de permission caméra iOS…', 'scan');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+      // Amorçage iOS : attacher le flux, lancer la vidéo, puis arrêter le flux avant ZXing.
+      activeStream = stream;
+      videoEl.srcObject = stream;
+      await videoEl.play().catch(() => null);
+      await new Promise(resolve => setTimeout(resolve, 250));
+      stopActiveStream();
+      permissionPrimed = true;
+      setStatus('Permission caméra accordée. Chargement du moteur de scan…', 'ok');
     }
 
-    async function startScan(){
-      updateLibHint();
-      if(typeof ZXingBrowser === 'undefined'){
-        alert('ZXingBrowser non chargé (CDN bloqué).');
-        return;
+    function stopActiveStream() {
+      try {
+        if (videoEl.srcObject && videoEl.srcObject.getTracks) {
+          videoEl.srcObject.getTracks().forEach(t => t.stop());
+        }
+      } catch (_) {}
+      try {
+        if (activeStream && activeStream.getTracks) {
+          activeStream.getTracks().forEach(t => t.stop());
+        }
+      } catch (_) {}
+      activeStream = null;
+      videoEl.srcObject = null;
+    }
+
+    async function loadZXing() {
+      if (zxingLoaded && window.ZXing && window.ZXing.BrowserMultiFormatReader) return;
+      await new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-zxing="1"]');
+        if (existing && window.ZXing && window.ZXing.BrowserMultiFormatReader) {
+          zxingLoaded = true;
+          resolve();
+          return;
+        }
+        const script = existing || document.createElement('script');
+        if (!existing) {
+          script.src = 'https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js';
+          script.async = true;
+          script.defer = true;
+          script.dataset.zxing = '1';
+          document.head.appendChild(script);
+        }
+        script.onload = () => {
+          zxingLoaded = true;
+          resolve();
+        };
+        script.onerror = () => reject(new Error('Impossible de charger ZXing (connexion Internet requise pour la librairie CDN).'));
+      });
+    }
+
+    async function startScanner() {
+      if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        throw new Error('La caméra iPhone exige HTTPS ou localhost.');
       }
+      btnStart.disabled = true;
+      try {
+        if (!permissionPrimed) {
+          await primeCameraPermissionIOS();
+        }
+        await loadZXing();
+        setStatus('Scanner actif… visez un code barre Code 128.', 'scan');
+        btnStop.disabled = false;
+        lastDecodedText = '';
+        lastDecodedAt = 0;
 
-      // 1) popup permission (si nécessaire)
-      try{
-        await primeCameraPermission();
-      }catch(e){
-        alert('Accès caméra refusé/bloqué.');
-        log('primeCameraPermission: ' + (e && e.name ? e.name : e));
-        return;
-      }
-
-      // 2) stop scan précédent
-      if(controls){ try{ controls.stop(); }catch(e){} controls=null; }
-
-      $('startBtn').disabled = true;
-      $('stopBtn').disabled = false;
-      log('Initialisation scan…');
-
-      try{
-        const devices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
-        const deviceId = devices && devices.length ? devices[devices.length-1].deviceId : undefined;
-
-        // ✅ CODE 128 UNIQUEMENT
         const hints = new Map();
-        hints.set(ZXingBrowser.DecodeHintType.POSSIBLE_FORMATS, [ZXingBrowser.BarcodeFormat.CODE_128]);
+        hints.set(window.ZXing.DecodeHintType.POSSIBLE_FORMATS, [window.ZXing.BarcodeFormat.CODE_128]);
+        codeReader = new window.ZXing.BrowserMultiFormatReader(hints, 300);
 
-        const reader = new ZXingBrowser.BrowserMultiFormatReader(hints);
-
-        controls = await reader.decodeFromVideoDevice(
-          deviceId,
-          $('video'),
-          (result, error, ctrl) => {
-            if(result){
-              const text = norm(result.text || (result.getText ? result.getText() : ''));
-              $('lastCode').textContent = text || '—';
-              lookup(text);
-              try{ (ctrl||controls).stop(); }catch(e){}
-              controls = null;
-              $('startBtn').disabled = false;
-              $('stopBtn').disabled = true;
-              log('Scan OK');
+        controls = await codeReader.decodeFromConstraints(
+          {
+            audio: false,
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          },
+          videoEl,
+          (result, err, ctl) => {
+            if (ctl && !controls) controls = ctl;
+            if (result) {
+              const text = typeof result.getText === 'function' ? result.getText() : String(result.text || result);
+              const now = Date.now();
+              if (text === lastDecodedText && (now - lastDecodedAt) < 1800) return;
+              lastDecodedText = text;
+              lastDecodedAt = now;
+              if (navigator.vibrate) navigator.vibrate(120);
+              renderResult(text);
+              stopScanner();
+            } else if (err && err.name && err.name !== 'NotFoundException') {
+              console.warn(err);
             }
           }
         );
-
-        log('Scan en cours…');
-      }catch(e){
-        $('startBtn').disabled = false;
-        $('stopBtn').disabled = true;
-        log('Erreur ZXing: ' + (e && e.name ? e.name : e));
+      } catch (error) {
+        console.error(error);
+        setStatus(error.message || 'Erreur de démarrage du scanner.', 'bad');
+      } finally {
+        btnStart.disabled = false;
       }
     }
 
-    function stopScan(){
-      if(controls){ try{ controls.stop(); }catch(e){} controls=null; }
-      try{ const v=$('video'); v.pause(); v.srcObject=null; }catch(e){}
-      $('startBtn').disabled = false;
-      $('stopBtn').disabled = true;
-      log('Scan stoppé');
+    function stopScanner() {
+      try { if (controls && typeof controls.stop === 'function') controls.stop(); } catch (_) {}
+      try { if (codeReader && typeof codeReader.reset === 'function') codeReader.reset(); } catch (_) {}
+      controls = null;
+      codeReader = null;
+      stopActiveStream();
+      btnStop.disabled = true;
+      if (!resultEl.innerHTML) setStatus('Scan arrêté.', 'ok');
     }
 
-    $('fileInput').addEventListener('change', async (e)=>{
-      updateLibHint();
-      const f = e.target.files && e.target.files[0];
-      if(!f) return;
-      try{
-        const buf = await f.arrayBuffer();
-        const wb = XLSX.read(buf, {type:'array'});
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true});
-        db = new Map();
-        for(let i=1;i<rows.length;i++){
-          const r = rows[i] || [];
-          const a = norm(r[0]);
-          const b = norm(r[1]);
-          const d = toDisplayDate(r[2]);
-          if(a) db.set(a, d);
-          if(b) db.set(b, d);
-        }
-        setDbOk(`${f.name} chargé • entrées: ${db.size}`);
-        setResult('—');
-        log('Base prête');
-      }catch(err){
-        setDbKo('Erreur lecture Excel');
-        log('XLSX err: ' + err);
+    btnStart.addEventListener('click', () => startScanner());
+    btnStop.addEventListener('click', () => stopScanner());
+
+    btnSearch.addEventListener('click', () => {
+      const value = manualInput.value.trim();
+      if (!value) {
+        setStatus('Saisissez un SN ou un code barre avant la recherche.', 'bad');
+        return;
+      }
+      renderResult(value);
+    });
+
+    manualInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        btnSearch.click();
       }
     });
 
-    $('startBtn').addEventListener('click', startScan);
-    $('stopBtn').addEventListener('click', stopScan);
-    $('searchBtn').addEventListener('click', ()=>lookup($('manual').value));
-    $('manual').addEventListener('keydown', (e)=>{ if(e.key==='Enter') lookup($('manual').value); });
-
-    updateLibHint();
-    setDbKo('Base non chargée.');
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stopScanner();
+    });
   </script>
 </body>
 </html>
