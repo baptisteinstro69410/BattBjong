@@ -1,81 +1,242 @@
 <!doctype html>
 <html lang="fr">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>BJONG Scan – Code 128</title>
-<link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#0b1220" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<style>
-body{margin:0;font-family:-apple-system;background:#0b1220;color:#e8eefc;padding:14px}
-button{padding:12px 16px;font-size:16px;border-radius:10px;border:none}
-#reader video{width:100%;border-radius:12px}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>BJONG Scan – Code 128</title>
+
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <style>
+    :root{--bg:#0b1220;--card:#111a2e;--txt:#e8eefc;--muted:#aab8de;--ok:#1ad17a;--ko:#ff5c5c;--acc:#6aa6ff;}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#081022,#0b1220);color:var(--txt);}
+    .wrap{max-width:900px;margin:0 auto;padding:16px 14px 34px;}
+    h1{font-size:20px;margin:10px 0 12px;}
+    .card{background:rgba(17,26,46,.92);border:1px solid rgba(106,166,255,.18);border-radius:14px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.35);}
+    label{display:block;font-size:13px;color:var(--muted);margin:6px 0;}
+    input[type=file],input[type=text]{width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(170,184,222,.25);background:#0c1427;color:var(--txt);}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    button{appearance:none;border:0;border-radius:12px;padding:10px 14px;background:var(--acc);color:#071022;font-weight:800;cursor:pointer;}
+    button.secondary{background:transparent;border:1px solid rgba(106,166,255,.45);color:var(--txt);}
+    button:disabled{opacity:.55;cursor:not-allowed;}
+    .status{margin-top:12px;padding:10px 12px;border-radius:12px;border:1px solid rgba(170,184,222,.18);background:rgba(12,20,39,.9);}
+    .status.ok{border-color:rgba(26,209,122,.45);} .status.ko{border-color:rgba(255,92,92,.45);}
+    .hint{font-size:12px;color:var(--muted);line-height:1.45;margin-top:6px;}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;}
+
+    .camwrap{position:relative;margin-top:12px;border-radius:14px;overflow:hidden;border:1px solid rgba(170,184,222,.20);background:#000;}
+    video{width:100%;height:auto;display:block;}
+    .overlay{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center;}
+    .reticle{width:72%;height:44%;border:2px solid rgba(106,166,255,.8);border-radius:14px;box-shadow:0 0 0 2000px rgba(0,0,0,.25) inset;}
+  </style>
 </head>
 <body>
-<h2>BJONG Scan – Code 128 uniquement</h2>
-<input type="file" id="file" accept=".xlsx"><br><br>
-<button id="start">Démarrer le scan</button>
-<button id="stop" disabled>Stop</button>
-<div id="reader"><video id="video" playsinline muted autoplay></video></div>
-<pre id="out"></pre>
+  <div class="wrap">
+    <h1>BJONG Scan – <span class="mono">CODE 128</span> uniquement</h1>
 
-async function primeCameraPermission(){
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "environment" },
-    audio: false
-  });
+    <div class="card">
+      <label>1) Charger le fichier Excel (.xlsx)</label>
+      <input id="fileInput" type="file" accept=".xlsx" />
+      <div class="hint">Recherche SN dans colonne A (NS) ou B (NS (V)), affiche la DATE (colonne C). Tolérance automatique avec/sans préfixe <span class="mono">V</span>.</div>
 
-  // stop immédiat : on veut juste la permission
-  stream.getTracks().forEach(t => t.stop());
-}
- 
-<script src="https://unpkg.com/@zxing/browser@latest"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script>
-let db=new Map(), controls=null;
-const out=t=>document.getElementById('out').textContent=t;
-const norm=v=>String(v||'').trim().toUpperCase();
+      <div class="status" id="dbStatus">
+        <div class="hint" id="dbHint">Base non chargée.</div>
+        <div class="hint mono" id="libHint">ZXingBrowser: … • XLSX: …</div>
+      </div>
 
-file.onchange=async e=>{
- const buf=await e.target.files[0].arrayBuffer();
- const wb=XLSX.read(buf,{type:'array'});
- const ws=wb.Sheets[wb.SheetNames[0]];
- XLSX.utils.sheet_to_json(ws,{header:1}).slice(1).forEach(r=>{
-  if(r[0]) db.set(norm(r[0]), r[2]);
-  if(r[1]) db.set(norm(r[1]), r[2]);
- });
- out('Base chargée');
-};
+      <label style="margin-top:12px">2) Scanner (Code 128)</label>
+      <div class="row">
+        <button id="startBtn">Démarrer le scan</button>
+        <button id="stopBtn" class="secondary" disabled>Stop</button>
+      </div>
 
-start.onclick = async () => {
+      <div class="camwrap">
+        <video id="video" playsinline muted autoplay></video>
+        <div class="overlay"><div class="reticle"></div></div>
+      </div>
 
-  // ✅ FORÇAGE PERMISSION iOS (critique)
-  try {
-    await primeCameraPermission();
-  } catch(e) {
-    alert("Accès caméra refusé");
-    return;
-  }
+      <div class="status" id="resultBox">
+        <div><b>Dernier code :</b> <span class="mono" id="lastCode">—</span></div>
+        <div><b>Résultat :</b> <span class="mono" id="result">—</span></div>
+        <div class="hint mono" id="debug">—</div>
+      </div>
 
-  // ensuite SEULEMENT ZXing
- hints.set(ZXingBrowser.DecodeHintType.POSSIBLE_FORMATS,[ZXingBrowser.BarcodeFormat.CODE_128]);
- const reader=new ZXingBrowser.BrowserMultiFormatReader(hints);
- stop.disabled=false; start.disabled=true;
- controls=await reader.decodeFromVideoDevice(id, video,(res,err,ctrl)=>{
-  if(res){
-   const k=norm(res.text||res.getText());
-   const d=db.get(k)||db.get('V'+k)||db.get(k.replace(/^V/,''));
-   out(d?`${k} → ${d}`:`${k} → NON TROUVÉ`);
-   ctrl.stop(); controls=null;
-   start.disabled=false; stop.disabled=true;
-  }
- });
-};
+      <label style="margin-top:12px">Saisie manuelle (option)</label>
+      <input id="manual" type="text" placeholder="ex: 2021000128930 ou V2021000128930" />
+      <div class="row" style="margin-top:10px">
+        <button id="searchBtn" class="secondary">Rechercher</button>
+      </div>
+    </div>
+  </div>
 
-stop.onclick=()=>{ if(controls){controls.stop();controls=null;} start.disabled=false; stop.disabled=true; }
-</script>
+  <!-- Décodeur Code 128 (ZXing Browser) + lecture Excel -->
+  <script src="https://unpkg.com/@zxing/browser@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <script>
+    let db = new Map();
+    let controls = null;
+
+    const $ = (id)=>document.getElementById(id);
+    const norm = (v)=>String(v||'').trim().replace(/\s+/g,'').toUpperCase();
+
+    function setDbOk(msg){
+      $('dbStatus').classList.add('ok');
+      $('dbStatus').classList.remove('ko');
+      $('dbHint').textContent = msg;
+    }
+    function setDbKo(msg){
+      $('dbStatus').classList.add('ko');
+      $('dbStatus').classList.remove('ok');
+      $('dbHint').textContent = msg;
+    }
+    function log(msg){ $('debug').textContent = msg; }
+    function setResult(txt){ $('result').textContent = txt; }
+
+    function updateLibHint(){
+      const okZX = (typeof ZXingBrowser !== 'undefined');
+      const okX  = (typeof XLSX !== 'undefined');
+      $('libHint').textContent = `ZXingBrowser: ${okZX?'OK':'KO'} • XLSX: ${okX?'OK':'KO'}`;
+    }
+
+    function toDisplayDate(v){
+      if(v==null || v==='') return '';
+      if(v instanceof Date && !isNaN(v)) return v.toLocaleString('fr-FR');
+      if(typeof v === 'number' && typeof XLSX !== 'undefined'){
+        const d = XLSX.SSF.parse_date_code(v);
+        if(d){
+          const dt = new Date(d.y, d.m-1, d.d, d.H||0, d.M||0, Math.floor(d.S||0));
+          return dt.toLocaleString('fr-FR');
+        }
+      }
+      return String(v);
+    }
+
+    function lookup(raw){
+      const code = norm(raw);
+      if(!code){ setResult('SN vide'); return; }
+      let hit = db.get(code);
+      if(!hit){
+        if(code.startsWith('V')) hit = db.get(code.substring(1));
+        else hit = db.get('V'+code);
+      }
+      if(hit) setResult(`${code} → ${hit}`);
+      else setResult(`${code} → NON TROUVÉ`);
+    }
+
+    // ✅ Amorçage permission caméra iOS (popup déclenchée ici)
+    async function primeCameraPermission(){
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      s.getTracks().forEach(t=>t.stop());
+    }
+
+    async function startScan(){
+      updateLibHint();
+      if(typeof ZXingBrowser === 'undefined'){
+        alert('ZXingBrowser non chargé (réseau/CDN).');
+        return;
+      }
+      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        alert('getUserMedia indisponible dans ce contexte. Ouvre dans Safari.');
+        return;
+      }
+
+      // 1) popup iOS (si nécessaire)
+      try{
+        await primeCameraPermission();
+      }catch(e){
+        alert('Accès caméra refusé / bloqué.');
+        log('primeCameraPermission: ' + (e && e.name ? e.name : e));
+        return;
+      }
+
+      // 2) stop scan précédent
+      if(controls){ try{ controls.stop(); }catch(e){} controls=null; }
+
+      $('startBtn').disabled = true;
+      $('stopBtn').disabled = false;
+      log('Initialisation scan…');
+
+      try{
+        const devices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+        const deviceId = devices && devices.length ? devices[devices.length-1].deviceId : undefined;
+
+        // ✅ CODE 128 UNIQUEMENT
+        const hints = new Map();
+        hints.set(ZXingBrowser.DecodeHintType.POSSIBLE_FORMATS, [ZXingBrowser.BarcodeFormat.CODE_128]);
+        const reader = new ZXingBrowser.BrowserMultiFormatReader(hints);
+
+        controls = await reader.decodeFromVideoDevice(
+          deviceId,
+          $('video'),
+          (result, error, ctrl) => {
+            if(result){
+              const text = norm(result.text || (result.getText ? result.getText() : ''));
+              $('lastCode').textContent = text || '—';
+              lookup(text);
+              try{ (ctrl||controls).stop(); }catch(e){}
+              controls = null;
+              $('startBtn').disabled = false;
+              $('stopBtn').disabled = true;
+              log('Scan OK');
+            }
+          }
+        );
+
+        log('Scan en cours…');
+      }catch(e){
+        $('startBtn').disabled = false;
+        $('stopBtn').disabled = true;
+        log('Erreur ZXing: ' + (e && e.name ? e.name : e));
+      }
+    }
+
+    function stopScan(){
+      if(controls){ try{ controls.stop(); }catch(e){} controls=null; }
+      try{ const v=$('video'); v.pause(); v.srcObject=null; }catch(e){}
+      $('startBtn').disabled = false;
+      $('stopBtn').disabled = true;
+      log('Scan stoppé');
+    }
+
+    // Excel load
+    $('fileInput').addEventListener('change', async (e)=>{
+      updateLibHint();
+      const f = e.target.files && e.target.files[0];
+      if(!f) return;
+      try{
+        const buf = await f.arrayBuffer();
+        const wb = XLSX.read(buf, {type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true});
+        db = new Map();
+        for(let i=1;i<rows.length;i++){
+          const r = rows[i] || [];
+          const a = norm(r[0]);
+          const b = norm(r[1]);
+          const d = toDisplayDate(r[2]);
+          if(a) db.set(a, d);
+          if(b) db.set(b, d);
+        }
+        setDbOk(`${f.name} chargé • entrées: ${db.size}`);
+        setResult('—');
+        log('Base prête');
+      }catch(err){
+        setDbKo('Erreur lecture Excel');
+        log('XLSX err: ' + err);
+      }
+    });
+
+    $('startBtn').addEventListener('click', startScan);
+    $('stopBtn').addEventListener('click', stopScan);
+
+    $('searchBtn').addEventListener('click', ()=>lookup($('manual').value));
+    $('manual').addEventListener('keydown', (e)=>{ if(e.key==='Enter') lookup($('manual').value); });
+
+    updateLibHint();
+    setDbKo('Base non chargée.');
+  </script>
 </body>
 </html>
