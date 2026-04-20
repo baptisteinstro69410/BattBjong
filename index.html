@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>BJONG Scan</title>
 
-  <!-- PWA / iOS -->
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#0b1220" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -31,8 +30,6 @@
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;}
     .kv{display:grid;grid-template-columns:150px 1fr;gap:6px 10px;align-items:center;}
     .kv div:nth-child(odd){color:var(--muted);font-size:13px;}
-
-    /* Camera */
     .camwrap{position:relative;border-radius:14px;overflow:hidden;border:1px solid rgba(170,184,222,.20);background:#000;}
     video{width:100%;height:auto;display:block;}
     .overlay{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center;}
@@ -46,21 +43,20 @@
 
     <div class="grid">
       <div class="card">
-        <label>1) Charger la base (Excel .xlsx ou CSV)</label>
-        <input id="fileInput" type="file" accept=".xlsx,.csv,text/csv" />
-        <div class="hint">Tout reste local sur l’iPhone. Si la lecture .xlsx ne marche pas (lib non chargée), exporte ton Excel en CSV et charge le CSV.</div>
+        <label>1) Charger la base (Excel .xlsx)</label>
+        <input id="fileInput" type="file" accept=".xlsx" />
+        <div class="hint">Tout reste local. Colonnes attendues : A=NS, B=NS (V), C=DATE (ou détection par en-têtes).</div>
 
         <div style="margin-top:12px" class="status" id="dbStatus">
           <div><span class="pill" id="dbPill">Base non chargée</span></div>
-          <div class="hint" id="dbHint">Charge un fichier pour activer la recherche.</div>
-          <div class="hint" id="libHint"></div>
+          <div class="hint" id="dbHint">Charge un fichier Excel pour activer la recherche.</div>
+          <div class="hint mono" id="libHint">Libs…</div>
         </div>
 
         <label style="margin-top:12px">2) Scanner (ou saisie)</label>
         <div class="row">
-          <button id="startBtn">Démarrer caméra</button>
+          <button id="startBtn">Démarrer le scan</button>
           <button id="stopBtn" class="secondary" disabled>Stop</button>
-          <button id="testBtn" class="secondary">Test caméra</button>
         </div>
 
         <div style="margin-top:10px"></div>
@@ -71,7 +67,7 @@
         </div>
 
         <div class="hint" style="margin-top:10px">
-          <b>iPhone :</b> ouvre la page dans <b>Safari</b> (pas dans un aperçu Teams/Outlook/OneDrive). Le scan utilise l’API native <span class="mono">BarcodeDetector</span> si disponible.
+          <b>Note iPhone :</b> si tu ouvres depuis un aperçu (Teams/Outlook/OneDrive), la caméra peut être bloquée. Ouvre dans Safari.
         </div>
       </div>
 
@@ -95,29 +91,36 @@
     </div>
   </div>
 
-  <!-- XLSX: on tente d'abord en local (si tu mets le fichier dans le repo), sinon CDN. -->
-  <script src="xlsx.full.min.js" onerror="window.__XLSX_LOCAL_FAIL__=true"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" onerror="window.__XLSX_CDN_FAIL__=true"></script>
+  <!-- ZXing Browser (UMD) : via unpkg (recommandé par la doc) -->
+  <script src="https://unpkg.com/@zxing/browser@latest"></script>
+  <!-- XLSX -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <script>
-    const LS_KEY = 'bjong_scan_db_v2';
-    const LS_META = 'bjong_scan_meta_v2';
+    const LS_KEY = 'bjong_scan_db_zxing_v1';
+    const LS_META = 'bjong_scan_meta_zxing_v1';
 
     let db = null; // Map(normalizedSN -> {sn, date})
-    let scanning = false;
-    let stream = null;
-    let detector = null;
-    let scanTimer = null;
+    let controls = null; // ZXing scanner controls
 
     const $ = id => document.getElementById(id);
-
-    function logDebug(msg){
-      $('debug').textContent = msg;
-    }
 
     function normalizeSN(s){
       if(!s && s!==0) return '';
       return String(s).trim().replace(/\s+/g,'').toUpperCase();
+    }
+
+    function toDisplayDate(v){
+      if(v==null || v==='') return '';
+      if(v instanceof Date && !isNaN(v)) return v.toLocaleString('fr-FR');
+      if(typeof v === 'number' && typeof XLSX !== 'undefined'){
+        const d = XLSX.SSF.parse_date_code(v);
+        if(d){
+          const dt = new Date(d.y, d.m-1, d.d, d.H||0, d.M||0, Math.floor(d.S||0));
+          return dt.toLocaleString('fr-FR');
+        }
+      }
+      return String(v);
     }
 
     function setDbStatus(loaded, metaText=''){
@@ -131,7 +134,7 @@
       } else {
         box.classList.remove('ok'); box.classList.add('ko');
         pill.textContent = 'Base non chargée';
-        hint.textContent = 'Charge un fichier pour activer la recherche.';
+        hint.textContent = 'Charge un fichier Excel pour activer la recherche.';
       }
     }
 
@@ -139,7 +142,7 @@
       $('lastCode').textContent = code || '—';
       if(state==='ok'){
         $('resultBox').classList.add('ok'); $('resultBox').classList.remove('ko');
-        $('statusText').textContent = statusHint || 'Correspondance trouvée';
+        $('statusText').textContent = statusHint || 'Trouvé';
       } else if(state==='ko'){
         $('resultBox').classList.add('ko'); $('resultBox').classList.remove('ok');
         $('statusText').textContent = statusHint || 'Non trouvé';
@@ -150,6 +153,8 @@
       $('snFound').textContent = sn || '—';
       $('dateFound').textContent = date || '—';
     }
+
+    function logDebug(msg){ $('debug').textContent = msg; }
 
     function tryLookup(raw){
       const code = normalizeSN(raw);
@@ -173,31 +178,14 @@
       }
     }
 
-    function parseCSV(text){
-      // séparateur ; ou , ; gère les guillemets basiques
-      const lines = text.replace(/\r/g,'').split('\n').filter(l=>l.trim().length);
-      const splitLine = (line, sep) => {
-        const out=[]; let cur=''; let q=false;
-        for(let i=0;i<line.length;i++){
-          const c=line[i];
-          if(c==='"'){ q=!q; continue; }
-          if(!q && c===sep){ out.push(cur); cur=''; }
-          else cur+=c;
-        }
-        out.push(cur);
-        return out;
-      }
-      const sep = lines[0].includes(';') ? ';' : ',';
-      return lines.map(l=>splitLine(l, sep));
-    }
+    function buildDbFromWorksheet(ws){
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true});
+      if(!rows || rows.length===0) return new Map();
 
-    function buildDbFromRows(rows){
-      if(!rows || !rows.length) return new Map();
       const header = (rows[0]||[]).map(h=>normalizeSN(h));
-      // défaut A/B/C
       let colA=0, colB=1, colC=2;
       const idxNS = header.findIndex(h => h==='NS' || h==='SN' || h==='NSBATTERIE');
-      const idxNSV = header.findIndex(h => h==='NS(V)' || h==='NS(V)' || h==='NS(V)' );
+      const idxNSV = header.findIndex(h => h==='NS(V)' || h==='NS(V)');
       const idxDATE = header.findIndex(h => h==='DATE' || h==='HEUREDEDÉBUT' || h==='HEUREDEDEBUT');
       if(idxNS>=0) colA=idxNS;
       if(idxNSV>=0) colB=idxNSV;
@@ -205,40 +193,30 @@
 
       const map = new Map();
       for(let r=1;r<rows.length;r++){
-        const row=rows[r]||[];
-        const a=normalizeSN(row[colA]);
-        const b=normalizeSN(row[colB]);
-        const d=row[colC];
-        const date = (d instanceof Date) ? d.toLocaleString('fr-FR') : (d==null?'':String(d));
-        if(a) map.set(a,{sn:a,date});
-        if(b) map.set(b,{sn:b,date});
+        const row = rows[r] || [];
+        const a = normalizeSN(row[colA]);
+        const b = normalizeSN(row[colB]);
+        const date = toDisplayDate(row[colC]);
+        if(a) map.set(a, {sn:a, date});
+        if(b) map.set(b, {sn:b, date});
       }
       return map;
     }
 
-    async function loadFile(file){
-      const name = file.name.toLowerCase();
-      if(name.endsWith('.csv')){
-        const txt = await file.text();
-        const rows = parseCSV(txt);
-        db = buildDbFromRows(rows);
-      } else {
-        // xlsx
-        if(typeof XLSX === 'undefined'){
-          throw new Error('XLSX_NOT_AVAILABLE');
-        }
-        const buf = await file.arrayBuffer();
-        const wb = XLSX.read(buf, {type:'array'});
-        const sheetName = wb.SheetNames[0];
-        const ws = wb.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true});
-        db = buildDbFromRows(rows);
-      }
+    async function loadExcelFile(file){
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      // Feuille "Feuil1" si dispo sinon 1ère
+      const prefer = ['Feuil1','Sheet1'];
+      const sheetName = wb.SheetNames.find(n => prefer.includes(n)) || wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      db = buildDbFromWorksheet(ws);
 
-      const meta = {name:file.name, lastModified:file.lastModified, size:db.size};
+      const meta = {name:file.name, lastModified:file.lastModified, sheet:sheetName, size:db.size};
       localStorage.setItem(LS_KEY, JSON.stringify(Array.from(db.entries())));
       localStorage.setItem(LS_META, JSON.stringify(meta));
-      setDbStatus(true, `${meta.name} • entrées: ${meta.size}`);
+
+      setDbStatus(true, `${meta.name} • feuille: ${meta.sheet} • entrées: ${meta.size}`);
       setResult('', '', '', '', 'Base chargée');
     }
 
@@ -248,7 +226,7 @@
         if(!raw) return false;
         db = new Map(JSON.parse(raw));
         const meta = JSON.parse(localStorage.getItem(LS_META) || '{}');
-        setDbStatus(true, `${meta.name||'Base'} • entrées: ${meta.size||db.size}`);
+        setDbStatus(true, `${meta.name||'Excel'} • feuille: ${meta.sheet||'?'} • entrées: ${meta.size||db.size}`);
         setResult('', '', '', '', 'Base restaurée');
         return true;
       } catch(e){
@@ -257,131 +235,81 @@
     }
 
     function updateLibHint(){
-      const hints=[];
-      if(typeof BarcodeDetector !== 'undefined') hints.push('BarcodeDetector: OK');
-      else hints.push('BarcodeDetector: NON dispo (scan 1D/QR limité)');
-
-      if(typeof XLSX !== 'undefined') hints.push('XLSX: OK');
-      else {
-        if(window.__XLSX_LOCAL_FAIL__ || window.__XLSX_CDN_FAIL__) hints.push('XLSX: échec chargement (utilise CSV)');
-        else hints.push('XLSX: en chargement…');
-      }
-      $('libHint').textContent = hints.join(' • ');
+      const okZX = (typeof ZXingBrowser !== 'undefined');
+      const okXLSX = (typeof XLSX !== 'undefined');
+      $('libHint').textContent = `ZXingBrowser: ${okZX?'OK':'KO'} • XLSX: ${okXLSX?'OK':'KO'}`;
     }
 
-    async function testCamera(){
-      try{
-        const s = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}, audio:false});
-        // stop immediately
-        s.getTracks().forEach(t=>t.stop());
-        alert('✅ Caméra OK');
-      }catch(e){
-        alert('❌ Caméra bloquée: '+(e.name||e));
-      }
-    }
-
-    async function startCamera(){
-      if(scanning) return;
-      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-        logDebug('getUserMedia indisponible.');
+    async function startScan(){
+      if(typeof ZXingBrowser === 'undefined'){
+        alert('ZXingBrowser non chargé (réseau/CDN)');
         return;
       }
+      if(controls){
+        try{ controls.stop(); }catch(e){}
+        controls = null;
+      }
 
-      scanning = true;
       $('startBtn').disabled = true;
       $('stopBtn').disabled = false;
 
-      try{
-        stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}, audio:false});
-        const video = $('video');
-        video.srcObject = stream;
-        await video.play();
+      const videoEl = $('video');
+      logDebug('Initialisation caméra…');
 
-        if(typeof BarcodeDetector !== 'undefined'){
-          // On demande un set large; iOS filtrera.
-          const formats = ['qr_code','ean_13','ean_8','code_128','code_39','upc_a','upc_e','itf'];
-          detector = new BarcodeDetector({formats});
-          logDebug('Scan via BarcodeDetector…');
-          startDetectLoop();
-        } else {
-          logDebug('BarcodeDetector non disponible : impossible de scanner sans librairie externe.');
-        }
+      try{
+        // Liste des caméras (recommandé par la doc)
+        const devices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+        const selectedDeviceId = (devices && devices.length) ? devices[devices.length-1].deviceId : undefined; // souvent caméra arrière
+
+        const codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+
+        // Démarrage scan continu (signature conforme aux exemples doc)
+        controls = await codeReader.decodeFromVideoDevice(
+          selectedDeviceId,
+          videoEl,
+          (result, error, ctrl) => {
+            if(result){
+              const text = (result.text) ? result.text : (result.getText ? result.getText() : String(result));
+              $('lastCode').textContent = text;
+              tryLookup(text);
+              // stop after first success
+              try{ (ctrl||controls).stop(); }catch(e){}
+              controls = null;
+              $('startBtn').disabled = false;
+              $('stopBtn').disabled = true;
+              logDebug('Scan OK.');
+            }
+          }
+        );
+
+        logDebug('Scan en cours…');
+
       } catch(e){
-        logDebug('Erreur caméra: '+(e.name||e));
-        scanning = false;
+        logDebug('Erreur scan: ' + (e && e.name ? e.name : e));
         $('startBtn').disabled = false;
         $('stopBtn').disabled = true;
       }
     }
 
-    function startDetectLoop(){
-      const video = $('video');
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d', {willReadFrequently:true});
-
-      const tick = async () => {
-        if(!scanning || !detector) return;
-        try{
-          if(video.videoWidth && video.videoHeight){
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const codes = await detector.detect(canvas);
-            if(codes && codes.length){
-              const value = codes[0].rawValue || codes[0].value || '';
-              if(value){
-                tryLookup(value);
-                // stop après 1 hit
-                stopCamera();
-                return;
-              }
-            }
-          }
-        } catch(e){
-          // Sur iOS, detect peut lever si format non supporté.
-          logDebug('Detect err: '+(e.name||e));
-        }
-        scanTimer = setTimeout(tick, 220);
+    function stopScan(){
+      if(controls){
+        try{ controls.stop(); }catch(e){}
+        controls = null;
       }
-      tick();
-    }
-
-    function stopCamera(){
-      scanning = false;
+      try{ const v=$('video'); v.pause(); v.srcObject=null; }catch(e){}
       $('startBtn').disabled = false;
       $('stopBtn').disabled = true;
-      if(scanTimer) { clearTimeout(scanTimer); scanTimer=null; }
-      detector = null;
-      const v = $('video');
-      try{ v.pause(); v.srcObject = null; }catch(e){}
-      if(stream){
-        try{ stream.getTracks().forEach(t=>t.stop()); }catch(e){}
-        stream = null;
-      }
-      logDebug('Caméra stoppée.');
+      logDebug('Scan stoppé.');
     }
 
     // Bindings
-    $('fileInput').addEventListener('change', async (e)=>{
+    $('fileInput').addEventListener('change', (e)=>{
       const f = e.target.files && e.target.files[0];
-      if(!f) return;
-      try{
-        await loadFile(f);
-      }catch(err){
-        if(String(err).includes('XLSX_NOT_AVAILABLE')){
-          setDbStatus(false);
-          alert('Lecture .xlsx impossible (lib XLSX non chargée). Export Excel → CSV, puis charge le CSV.');
-        } else {
-          alert('Erreur lecture fichier: '+err);
-        }
-      }
-      updateLibHint();
+      if(f) loadExcelFile(f);
     });
 
-    $('startBtn').addEventListener('click', startCamera);
-    $('stopBtn').addEventListener('click', stopCamera);
-    $('testBtn').addEventListener('click', testCamera);
-
+    $('startBtn').addEventListener('click', startScan);
+    $('stopBtn').addEventListener('click', stopScan);
     $('searchBtn').addEventListener('click', ()=>tryLookup($('manual').value));
     $('manual').addEventListener('keydown', (e)=>{ if(e.key==='Enter') tryLookup($('manual').value); });
 
@@ -398,10 +326,8 @@
     updateLibHint();
     if(!restoreCache()){
       setDbStatus(false);
-      setResult('', '', '', '', 'Charge une base, puis démarre la caméra.');
+      setResult('', '', '', '', 'Charge un Excel puis scanne.');
     }
-
-    // refresh lib hint after a moment (CDN load)
     setTimeout(updateLibHint, 1200);
   </script>
 </body>
